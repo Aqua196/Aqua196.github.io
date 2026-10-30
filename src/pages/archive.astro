@@ -1,0 +1,111 @@
+---
+import Base from '../layouts/Base.astro';
+import { getPosts, categoryMeta, formatDate } from '../utils/posts';
+import { postUrl } from '../utils/url';
+
+const posts = await getPosts();
+const byYear = new Map<string, typeof posts>();
+for (const p of posts) {
+  const y = formatDate(p.data.date).slice(0, 4);
+  byYear.set(y, [...(byYear.get(y) ?? []), p]);
+}
+---
+
+<Base title="归档" description="所有 writeup 的时间线">
+  <div class="container">
+    <header class="page-head">
+      <div class="eyebrow" data-reveal>$ git log --oneline</div>
+      <h1 data-reveal style="--delay:.05s"><span data-scramble data-scramble-load>Archive</span></h1>
+      <p data-reveal style="--delay:.1s">共 {posts.length} 篇，按时间倒序。</p>
+    </header>
+
+    {
+      [...byYear].map(([year, list]) => (
+        <section class="year">
+          <h2 class="y mono" data-reveal>
+            {year}
+            <small>{String(list.length).padStart(2, '0')} posts</small>
+          </h2>
+          <ol>
+            {list.map((p, i) => (
+              <li data-reveal style={`--delay:${Math.min(i, 10) * 0.03}s`}>
+                <a href={postUrl(p.id)}>
+                  <time class="mono">{formatDate(p.data.date).slice(5)}</time>
+                  <span class="t">{p.data.title}</span>
+                  <span class="c mono">{categoryMeta(p.data.category).label}</span>
+                </a>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ))
+    }
+  </div>
+</Base>
+
+<style>
+  .year {
+    display: grid;
+    grid-template-columns: 10rem minmax(0, 1fr);
+    gap: 1rem;
+    padding-top: 1rem;
+    margin-bottom: 3rem;
+    border-top: 1px solid var(--fg);
+  }
+  .y {
+    margin: 0;
+    font-size: 2.6rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.05em;
+  }
+  .y small {
+    display: block;
+    margin-top: 0.6rem;
+    font-size: 0.7rem;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+  ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  li a {
+    display: grid;
+    grid-template-columns: 3.5rem minmax(0, 1fr) auto;
+    gap: 1rem;
+    align-items: baseline;
+    padding: 0.7rem 0.6rem;
+    margin: 0 -0.6rem;
+    border-bottom: 1px solid var(--line);
+    transition: background 0.12s, color 0.12s;
+  }
+  li a:hover {
+    background: var(--fg);
+    color: var(--bg);
+  }
+  time,
+  .c {
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+  .c {
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  li a:hover time,
+  li a:hover .c {
+    color: inherit;
+    opacity: 0.7;
+  }
+  .t {
+    font-weight: 550;
+  }
+  @media (max-width: 720px) {
+    .year {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

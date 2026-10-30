@@ -1,0 +1,65 @@
+<button class="to-top mono" id="to-top" type="button" aria-label="回到顶部">
+  <span class="pct" id="to-top-pct">0%</span>
+  <span class="up" aria-hidden="true">↑</span>
+</button>
+
+<style>
+  .to-top {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 40;
+    width: 48px;
+    height: 48px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--fg);
+    background: var(--bg);
+    color: var(--fg);
+    font-size: 0.72rem;
+    cursor: pointer;
+    opacity: 0;
+    transform: translateY(10px);
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.3s var(--ease), background 0.15s, color 0.15s;
+  }
+  .to-top.show {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+  .to-top > span {
+    grid-area: 1 / 1;
+  }
+  .up {
+    font-size: 1.1rem;
+    opacity: 0;
+  }
+  .to-top:hover {
+    background: var(--fg);
+    color: var(--bg);
+  }
+  .to-top:hover .pct {
+    opacity: 0;
+  }
+  .to-top:hover .up {
+    opacity: 1;
+  }
+</style>
+
+<script>
+  function update() {
+    const btn = document.getElementById('to-top');
+    const pct = document.getElementById('to-top-pct');
+    if (!btn || !pct) return;
+    const max = document.documentElement.scrollHeight - innerHeight;
+    const p = max > 0 ? Math.min(1, scrollY / max) : 0;
+    pct.textContent = `${Math.round(p * 100)}%`;
+    btn.classList.toggle('show', scrollY > 400);
+  }
+  window.addEventListener('scroll', () => requestAnimationFrame(update), { passive: true });
+  document.addEventListener('astro:page-load', () => {
+    update();
+    document.getElementById('to-top')?.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+  });
+</script>

@@ -1,0 +1,56 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getPosts, countBy } from '../../utils/posts';
+import { tagUrl } from '../../utils/url';
+
+const posts = await getPosts();
+const tags = countBy(posts, (p) => p.data.tags);
+const max = Math.max(1, ...tags.map(([, n]) => n));
+---
+
+<Base title="标签" description="所有标签">
+  <div class="container">
+    <header class="page-head">
+      <div class="eyebrow" data-reveal>$ sort tags | uniq -c</div>
+      <h1 data-reveal style="--delay:.05s"><span data-scramble data-scramble-load>Tags</span></h1>
+      <p data-reveal style="--delay:.1s">{tags.length} 个标签，字越大用得越多。</p>
+    </header>
+
+    <div class="cloud mono" data-reveal style="--delay:.15s">
+      {
+        tags.map(([t, n]) => (
+          <a href={tagUrl(t)} style={`--s:${(0.85 + (n / max) * 1.15).toFixed(2)}rem`}>
+            #{t}
+            <sup>{n}</sup>
+          </a>
+        ))
+      }
+    </div>
+  </div>
+</Base>
+
+<style>
+  .cloud {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem 0.6rem;
+    max-width: 900px;
+  }
+  a {
+    font-size: var(--s);
+    padding: 0.15em 0.5em;
+    border: 1px solid var(--line-2);
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+  }
+  a:hover {
+    background: var(--fg);
+    color: var(--bg);
+    border-color: var(--fg);
+  }
+  sup {
+    font-size: 0.6em;
+    margin-left: 0.15em;
+    opacity: 0.55;
+  }
+</style>

@@ -1,0 +1,98 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getPosts, countBy, categoryMeta } from '../../utils/posts';
+import { categoryUrl, postUrl } from '../../utils/url';
+
+const posts = await getPosts();
+const cats = countBy(posts, (p) => p.data.category);
+---
+
+<Base title="分类" description="按方向浏览 writeup">
+  <div class="container">
+    <header class="page-head">
+      <div class="eyebrow" data-reveal>$ ls ./categories</div>
+      <h1 data-reveal style="--delay:.05s"><span data-scramble data-scramble-load>Categories</span></h1>
+      <p data-reveal style="--delay:.1s">{cats.length} 个方向。</p>
+    </header>
+
+    <div class="grid" data-reveal style="--delay:.15s">
+      {
+        cats.map(([key, n]) => {
+          const recent = posts.filter((p) => p.data.category === key).slice(0, 3);
+          return (
+            <section class="cat">
+              <a class="head" href={categoryUrl(key)}>
+                <h2 class="mono">{categoryMeta(key).label}</h2>
+                <span class="n mono">{String(n).padStart(2, '0')}</span>
+              </a>
+              <ul>
+                {recent.map((p) => (
+                  <li>
+                    <a href={postUrl(p.id)}>{p.data.title}</a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          );
+        })
+      }
+    </div>
+  </div>
+</Base>
+
+<style>
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+    border-top: 1px solid var(--fg);
+    border-left: 1px solid var(--line);
+  }
+  .cat {
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  .head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 1.2rem 1.2rem 1rem;
+    transition: background 0.12s, color 0.12s;
+  }
+  .head:hover {
+    background: var(--fg);
+    color: var(--bg);
+  }
+  h2 {
+    margin: 0;
+    font-size: 1rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .n {
+    font-size: 2.2rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.05em;
+  }
+  ul {
+    list-style: none;
+    margin: 0;
+    padding: 0 1.2rem 1.1rem;
+  }
+  li {
+    padding: 0.4rem 0;
+    border-top: 1px solid var(--line);
+    font-size: 0.88rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  li a {
+    color: var(--fg-2);
+  }
+  li a:hover {
+    color: var(--fg);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+</style>

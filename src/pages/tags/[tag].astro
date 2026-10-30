@@ -1,0 +1,36 @@
+---
+import Base from '../../layouts/Base.astro';
+import PostRow from '../../components/PostRow.astro';
+import { getPosts, type Post } from '../../utils/posts';
+import { url } from '../../utils/url';
+
+export async function getStaticPaths() {
+  const posts = await getPosts();
+  const tags = [...new Set(posts.flatMap((p) => p.data.tags))];
+  return tags.map((tag) => ({
+    params: { tag },
+    props: { posts: posts.filter((p) => p.data.tags.includes(tag)) },
+  }));
+}
+
+interface Props {
+  posts: Post[];
+}
+const { posts } = Astro.props;
+const { tag } = Astro.params;
+---
+
+<Base title={`#${tag}`} description={`标签 ${tag} 下的 writeup`}>
+  <div class="container">
+    <header class="page-head">
+      <div class="eyebrow" data-reveal>$ grep -rl "#{tag}" ./writeups</div>
+      <h1 data-reveal style="--delay:.05s">#{tag}</h1>
+      <p data-reveal style="--delay:.1s">
+        共 {posts.length} 篇 · <a href={url('/tags')}>全部标签</a>
+      </p>
+    </header>
+    <ol class="post-list">
+      {posts.map((post, i) => <PostRow post={post} index={i} />)}
+    </ol>
+  </div>
+</Base>

@@ -1,0 +1,201 @@
+---
+import Base from '../layouts/Base.astro';
+import Hero from '../components/Hero.astro';
+import PostRow from '../components/PostRow.astro';
+import { SITE } from '../config';
+import { getHomePosts, countBy, categoryMeta } from '../utils/posts';
+import { url, categoryUrl, tagUrl } from '../utils/url';
+
+const posts = await getHomePosts();
+const categories = countBy(posts, (p) => p.data.category);
+const tags = countBy(posts, (p) => p.data.tags);
+const latest = posts.slice(0, SITE.homePostCount);
+
+// 跑马灯：标签不够多就重复几遍
+let ticker = tags.map(([t]) => t);
+while (ticker.length > 0 && ticker.length < 14) ticker = ticker.concat(ticker);
+---
+
+<Base>
+  <Hero postCount={posts.length} categoryCount={categories.length} tagCount={tags.length} />
+
+  {
+    ticker.length > 0 && (
+      <div class="ticker mono" aria-hidden="true">
+        <div class="track">
+          {[0, 1].map(() => (
+            <div class="row">
+              {ticker.map((t) => (
+                <span>{t}</span>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  <section class="container block">
+    <div class="section-head" data-reveal>
+      <h2><span data-scramble>Index</span><span class="zh">分类</span></h2>
+      <a href={url('/categories')}>all categories →</a>
+    </div>
+    <div class="cats" data-reveal>
+      {
+        categories.map(([key, n]) => (
+          <a href={categoryUrl(key)}>
+            <span class="name mono">{categoryMeta(key).label}</span>
+            <span class="n mono">{String(n).padStart(2, '0')}</span>
+          </a>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="container block" id="latest">
+    <div class="section-head" data-reveal>
+      <h2><span data-scramble>Latest</span><span class="zh">最新文章</span></h2>
+      <a href={url('/archive')}>view all →</a>
+    </div>
+    {
+      latest.length > 0 ? (
+        <ol class="post-list">
+          {latest.map((post, i) => (
+            <PostRow post={post} index={i} />
+          ))}
+        </ol>
+      ) : (
+        <p class="empty mono">// 还没有文章，去 src/content/posts/ 写第一篇吧</p>
+      )
+    }
+    {
+      posts.length > latest.length && (
+        <div class="more">
+          <a class="btn" href={url('/archive')}>
+            查看全部 {posts.length} 篇 →
+          </a>
+        </div>
+      )
+    }
+  </section>
+
+  {
+    tags.length > 0 && (
+      <section class="container block">
+        <div class="section-head" data-reveal>
+          <h2>
+            <span data-scramble>Tags</span>
+            <span class="zh">标签</span>
+          </h2>
+          <a href={url('/tags')}>all tags →</a>
+        </div>
+        <div class="tags mono" data-reveal>
+          {tags.slice(0, 30).map(([t, n]) => (
+            <a href={tagUrl(t)}>
+              #{t}
+              <sup>{n}</sup>
+            </a>
+          ))}
+        </div>
+      </section>
+    )
+  }
+</Base>
+
+<style>
+  .block {
+    margin-top: 5rem;
+  }
+
+  /* ---------- 反色跑马灯 ---------- */
+  .ticker {
+    overflow: hidden;
+    background: var(--fg);
+    color: var(--bg);
+    padding: 0.7rem 0;
+  }
+  .track {
+    display: flex;
+    width: max-content;
+    animation: marquee 45s linear infinite;
+  }
+  .ticker:hover .track {
+    animation-play-state: paused;
+  }
+  .row {
+    display: flex;
+    font-size: 0.85rem;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+  .row span::after {
+    content: '/';
+    margin: 0 1.4rem;
+    opacity: 0.4;
+  }
+  @keyframes marquee {
+    to {
+      transform: translateX(-50%);
+    }
+  }
+
+  /* ---------- 分类 ---------- */
+  .cats {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr));
+    border-top: 1px solid var(--line);
+    border-left: 1px solid var(--line);
+  }
+  .cats a {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 1rem 1.1rem;
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    transition: background 0.12s, color 0.12s;
+  }
+  .cats a:hover {
+    background: var(--fg);
+    color: var(--bg);
+  }
+  .name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .n {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+  }
+
+  .more {
+    margin-top: 2rem;
+  }
+  .empty {
+    color: var(--muted);
+  }
+
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.5rem;
+  }
+  .tags a {
+    font-size: 0.82rem;
+    padding: 0.2rem 0.55rem;
+    border: 1px solid var(--line-2);
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+  }
+  .tags a:hover {
+    background: var(--fg);
+    color: var(--bg);
+    border-color: var(--fg);
+  }
+  .tags sup {
+    margin-left: 0.15rem;
+    opacity: 0.55;
+  }
+</style>

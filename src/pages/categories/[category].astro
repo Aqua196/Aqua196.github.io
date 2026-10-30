@@ -1,0 +1,37 @@
+---
+import Base from '../../layouts/Base.astro';
+import PostRow from '../../components/PostRow.astro';
+import { getPosts, categoryMeta, type Post } from '../../utils/posts';
+import { url } from '../../utils/url';
+
+export async function getStaticPaths() {
+  const posts = await getPosts();
+  const keys = [...new Set(posts.map((p) => p.data.category))];
+  return keys.map((category) => ({
+    params: { category },
+    props: { posts: posts.filter((p) => p.data.category === category) },
+  }));
+}
+
+interface Props {
+  posts: Post[];
+}
+const { posts } = Astro.props;
+const { category } = Astro.params;
+const label = categoryMeta(category!).label;
+---
+
+<Base title={`分类 · ${label}`} description={`${label} 方向的全部 writeup`}>
+  <div class="container">
+    <header class="page-head">
+      <div class="eyebrow" data-reveal>$ cd ./categories/{category}</div>
+      <h1 data-reveal style="--delay:.05s"><span data-scramble data-scramble-load>{label}</span></h1>
+      <p data-reveal style="--delay:.1s">
+        共 {posts.length} 篇 · <a href={url('/categories')}>全部分类</a>
+      </p>
+    </header>
+    <ol class="post-list">
+      {posts.map((post, i) => <PostRow post={post} index={i} />)}
+    </ol>
+  </div>
+</Base>

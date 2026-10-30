@@ -1,0 +1,170 @@
+---
+import { ClientRouter } from 'astro:transitions';
+import '@fontsource-variable/jetbrains-mono';
+import '../styles/global.css';
+import { SITE } from '../config';
+import { url } from '../utils/url';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Search from '../components/Search.astro';
+import BackToTop from '../components/BackToTop.astro';
+
+interface Props {
+  title?: string;
+  description?: string;
+  type?: 'website' | 'article';
+}
+
+const { title, description = SITE.description, type = 'website' } = Astro.props;
+const fullTitle = title ? `${title} | ${SITE.title}` : `${SITE.title} — ${SITE.author}`;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+---
+
+<!doctype html>
+<html lang={SITE.lang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href={url('/favicon.svg')} />
+    <link rel="alternate" type="application/rss+xml" title={SITE.title} href={url('/rss.xml')} />
+    <link rel="sitemap" href={url('/sitemap-index.xml')} />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0a0a" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fafaf8" />
+    <meta property="og:type" content={type} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:site_name" content={SITE.title} />
+    <meta name="generator" content={Astro.generator} />
+
+    <!-- 在首帧渲染前应用主题，避免闪烁：优先用户选择，其次跟随系统 -->
+    <script is:inline>
+      (function () {
+        var root = document.documentElement;
+        function apply() {
+          var t = null;
+          try {
+            t = localStorage.getItem('theme');
+          } catch (e) {}
+          if (t !== 'light' && t !== 'dark') {
+            t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+          }
+          root.dataset.theme = t;
+          root.classList.add('js');
+        }
+        apply();
+        if (!window.__themeHooked) {
+          window.__themeHooked = true;
+          document.addEventListener('astro:after-swap', apply);
+        }
+      })();
+    </script>
+    <ClientRouter fallback="swap" />
+    <slot name="head" />
+  </head>
+  <body>
+    <Header />
+    <main>
+      <slot />
+    </main>
+    <Footer />
+    <Search />
+    <BackToTop />
+  </body>
+</html>
+
+<script>
+  // ---------- 滚动出现 ----------
+  function initReveal() {
+    const els = document.querySelectorAll<HTMLElement>('[data-reveal]:not(.is-visible)');
+    if (!('IntersectionObserver' in window)) return els.forEach((el) => el.classList.add('is-visible'));
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible');
+            io.unobserve(entry.target);
+          }
+        }
+      },
+      { rootMargin: '0px 0px -6% 0px', threshold: 0.05 },
+    );
+    els.forEach((el) => io.observe(el));
+  }
+
+  // ---------- 乱码解密效果：[data-scramble] 的元素在加载和鼠标经过时播放 ----------
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const GLYPHS = '!<>-_\\/[]{}=+*^?#$%&01';
+  const running = new WeakSet<HTMLElement>();
+
+  function scramble(el: HTMLElement) {
+    if (reduce || running.has(el)) return;
+    const target = (el.dataset.text ??= el.textContent ?? '');
+    running.add(el);
+    let frame = 0;
+    const total = target.length * 3;
+    const tick = () => {
+      el.textContent = [...target]
+        .map((ch, i) => (ch === ' ' || i < frame / 3 ? ch : GLYPHS[(Math.random() * GLYPHS.length) | 0]))
+        .join('');
+      if (++frame <= total) setTimeout(tick, 28);
+      else {
+        el.textContent = target;
+        running.delete(el);
+      }
+    };
+    tick();
+  }
+
+  document.addEventListener('pointerover', (e) => {
+    const el = (e.target as HTMLElement).closest?.<HTMLElement>('[data-scramble]');
+    if (el && !el.contains(e.relatedTarget as Node)) scramble(el);
+  });
+
+  document.addEventListener('astro:page-load', () => {
+    initReveal();
+    document.querySelectorAll<HTMLElement>('[data-scramble-load]').forEach(scramble);
+  });
+
+  // ---------- 代码复制 / Flag 揭示 / 图片放大 ----------
+  document.addEventListener('click', async (e) => {
+    const target = e.target as HTMLElement;
+
+    const copyBtn = target.closest<HTMLButtonElement>('.code-copy');
+    if (copyBtn) {
+      const code = copyBtn.closest('.code-window')?.querySelector('pre code') as HTMLElement | null;
+      if (!code) return;
+      const text = [...code.querySelectorAll('.line')].map((l) => l.textContent).join('\n') || code.innerText;
+      try {
+        await navigator.clipboard.writeText(text);
+        copyBtn.textContent = 'copied';
+      } catch {
+        copyBtn.textContent = 'failed';
+      }
+      setTimeout(() => (copyBtn.textContent = 'copy'), 1500);
+      return;
+    }
+
+    const secret = target.closest<HTMLElement>('.callout-flag .callout-body, .spoiler');
+    if (secret && !secret.classList.contains('revealed')) {
+      secret.classList.add('revealed');
+      return;
+    }
+
+    const img = target.closest<HTMLImageElement>('.prose img');
+    if (img && !img.closest('a')) {
+      const box = document.createElement('div');
+      box.className = 'lightbox';
+      box.innerHTML = `<img src="${img.currentSrc || img.src}" alt="">`;
+      box.addEventListener('click', () => {
+        box.classList.remove('show');
+        setTimeout(() => box.remove(), 250);
+      });
+      document.body.append(box);
+      requestAnimationFrame(() => box.classList.add('show'));
+    }
+  });
+</script>

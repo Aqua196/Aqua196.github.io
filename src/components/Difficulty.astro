@@ -1,0 +1,10 @@
+---
+interface Props {
+  value: number;
+}
+const { value } = Astro.props;
+---
+
+<span class="diff" title={`难度 ${value}/5`} aria-label={`难度 ${value}/5`}>
+  {Array.from({ length: 5 }, (_, i) => <span class:list={{ off: i >= value }}>■</span>)}
+</span>

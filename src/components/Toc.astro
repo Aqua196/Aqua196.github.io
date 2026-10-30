@@ -1,0 +1,99 @@
+---
+import type { MarkdownHeading } from 'astro';
+
+interface Props {
+  headings: MarkdownHeading[];
+}
+const { headings } = Astro.props;
+---
+
+<aside class="toc" aria-label="目录">
+  <div class="label">Contents</div>
+  <ol id="toc-list">
+    {
+      headings.map((h) => (
+        <li class={`d${h.depth}`}>
+          <a href={`#${h.slug}`} data-slug={h.slug}>
+            {h.text}
+          </a>
+        </li>
+      ))
+    }
+  </ol>
+</aside>
+
+<style>
+  .toc {
+    position: sticky;
+    top: calc(var(--header-h) + 32px);
+    max-height: calc(100vh - var(--header-h) - 64px);
+    overflow-y: auto;
+  }
+  .label {
+    padding-bottom: 0.6rem;
+    margin-bottom: 0.4rem;
+    border-bottom: 1px solid var(--fg);
+    color: var(--fg);
+  }
+  ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  li a {
+    display: block;
+    padding: 0.32rem 0 0.32rem 1rem;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--muted);
+    border-left: 1px solid var(--line);
+    transition: color 0.15s, border-color 0.15s;
+  }
+  li.d3 a {
+    padding-left: 1.9rem;
+    font-size: 0.8rem;
+  }
+  li a:hover {
+    color: var(--fg);
+  }
+  li a.active {
+    color: var(--fg);
+    font-weight: 600;
+    border-left: 2px solid var(--fg);
+    padding-left: calc(1rem - 1px);
+  }
+  li.d3 a.active {
+    padding-left: calc(1.9rem - 1px);
+  }
+  @media (max-width: 1100px) {
+    .toc {
+      display: none;
+    }
+  }
+</style>
+
+<script>
+  function initToc() {
+    const links = [...document.querySelectorAll<HTMLAnchorElement>('#toc-list a')];
+    if (!links.length) return;
+    const heads = links
+      .map((a) => document.getElementById(a.dataset.slug!))
+      .filter((el): el is HTMLElement => !!el);
+
+    const update = () => {
+      let current = heads[0];
+      for (const h of heads) {
+        if (h.getBoundingClientRect().top - 140 <= 0) current = h;
+        else break;
+      }
+      links.forEach((a) => a.classList.toggle('active', a.dataset.slug === current?.id));
+    };
+    update();
+    const onScroll = () => requestAnimationFrame(update);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    document.addEventListener('astro:before-swap', () => window.removeEventListener('scroll', onScroll), {
+      once: true,
+    });
+  }
+  document.addEventListener('astro:page-load', initToc);
+</script>

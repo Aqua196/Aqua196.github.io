@@ -1,0 +1,35 @@
+---
+interface Props {
+  socials: Record<string, string>;
+}
+const { socials } = Astro.props;
+
+const LABELS: Record<string, string> = {
+  github: 'GitHub',
+  email: 'Email',
+  twitter: 'X',
+  bilibili: 'Bilibili',
+};
+
+const items = Object.entries(socials)
+  .filter(([, v]) => v)
+  .map(([k, v]) => ({
+    label: LABELS[k] ?? k,
+    href: k === 'email' && !v.startsWith('mailto:') ? `mailto:${v}` : v,
+  }));
+---
+
+{
+  items.map(({ label, href }) => (
+    <a class="social" href={href} target="_blank" rel="noopener">
+      {label} ↗
+    </a>
+  ))
+}
+
+<style>
+  .social:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+</style>

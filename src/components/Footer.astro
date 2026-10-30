@@ -1,0 +1,69 @@
+---
+import { SITE, SOCIALS } from '../config';
+import { url } from '../utils/url';
+import Socials from './Socials.astro';
+
+const year = new Date().getFullYear();
+---
+
+<footer class="site-footer">
+  <div class="container inner mono">
+    <div class="left">
+      <span>© {year} {SITE.author}</span>
+      <span class="dim">uptime <span id="uptime" data-since={SITE.since}>--</span></span>
+    </div>
+    <div class="right">
+      <Socials socials={SOCIALS} />
+      <a href={url('/rss.xml')}>RSS</a>
+      <span class="dim">
+        built with <a href="https://astro.build" target="_blank" rel="noopener">Astro</a>
+      </span>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .site-footer {
+    margin-top: 7rem;
+    border-top: 1px solid var(--line);
+  }
+  .inner {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.8rem 2rem;
+    padding-top: 1.5rem;
+    padding-bottom: 2rem;
+    font-size: 0.75rem;
+  }
+  .left,
+  .right {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1.2rem;
+  }
+  .dim {
+    color: var(--muted);
+  }
+  a:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+</style>
+
+<script>
+  function tick() {
+    const el = document.getElementById('uptime');
+    if (!el) return;
+    const since = new Date(el.dataset.since + 'T00:00:00+08:00').getTime();
+    const s = Math.max(0, Math.floor((Date.now() - since) / 1000));
+    const d = Math.floor(s / 86400);
+    const hh = String(Math.floor((s % 86400) / 3600)).padStart(2, '0');
+    const mm = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+    const ss = String(s % 60).padStart(2, '0');
+    el.textContent = `${d}d ${hh}:${mm}:${ss}`;
+  }
+  setInterval(tick, 1000);
+  document.addEventListener('astro:page-load', tick);
+</script>

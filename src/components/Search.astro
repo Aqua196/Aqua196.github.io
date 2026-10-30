@@ -1,0 +1,306 @@
+---
+import { url } from '../utils/url';
+---
+
+<dialog id="search-dialog" class="search" aria-label="搜索文章" data-index={url('/search.json')}>
+  <div class="panel">
+    <div class="input-row">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+      <input id="search-input" type="search" placeholder="搜索标题、标签、正文、exp…" autocomplete="off" spellcheck="false" />
+      <kbd>ESC</kbd>
+    </div>
+    <ul id="search-results" class="results" role="listbox"></ul>
+    <div class="foot mono">
+      <span><kbd>↑</kbd><kbd>↓</kbd> 选择</span>
+      <span><kbd>↵</kbd> 打开</span>
+      <span class="count" id="search-count"></span>
+    </div>
+  </div>
+</dialog>
+
+<style>
+  .search {
+    width: min(680px, calc(100vw - 32px));
+    max-height: min(600px, calc(100vh - 120px));
+    margin: 12vh auto auto;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--fg);
+    overflow: visible;
+  }
+  .search::backdrop {
+    background: color-mix(in srgb, var(--bg) 80%, transparent);
+  }
+  .search[open] .panel {
+    animation: pop 0.2s var(--ease);
+  }
+  @keyframes pop {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+  }
+  .panel {
+    display: flex;
+    flex-direction: column;
+    max-height: inherit;
+    background: var(--bg);
+    border: 1px solid var(--fg);
+    overflow: hidden;
+  }
+  .input-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.9rem 1.1rem;
+    border-bottom: 1px solid var(--line-2);
+    color: var(--muted);
+  }
+  input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--fg);
+    font-size: 1.05rem;
+    font-family: var(--font-body);
+  }
+  input::-webkit-search-cancel-button {
+    display: none;
+  }
+  .results {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .results :global(li a) {
+    display: block;
+    padding: 0.75rem 1.1rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .results :global(li.active a) {
+    background: var(--fg);
+    color: var(--bg);
+  }
+  .results :global(.r-title) {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-weight: 600;
+  }
+  .results :global(.r-snippet) {
+    margin-top: 0.2rem;
+    font-size: 0.85rem;
+    opacity: 0.65;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .results :global(mark) {
+    background: transparent;
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+  }
+  .results :global(.r-empty) {
+    padding: 2rem 1rem;
+    text-align: center;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+  }
+  .foot {
+    display: flex;
+    gap: 1rem;
+    padding: 0.55rem 1.1rem;
+    border-top: 1px solid var(--line-2);
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+  .foot kbd {
+    margin-right: 2px;
+  }
+  .count {
+    margin-left: auto;
+  }
+</style>
+
+<script>
+  import { navigate } from 'astro:transitions/client';
+
+  type Entry = {
+    title: string;
+    url: string;
+    description: string;
+    category: string;
+    categoryLabel: string;
+    tags: string[];
+    event: string;
+    date: string;
+    body: string;
+  };
+
+  let index: Entry[] | null = null;
+  let loading: Promise<Entry[]> | null = null;
+
+  const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  const escRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  function highlight(text: string, terms: string[]) {
+    if (!terms.length) return esc(text);
+    const re = new RegExp(`(${terms.map(escRe).join('|')})`, 'gi');
+    return text
+      .split(re)
+      .map((part, i) => (i % 2 ? `<mark>${esc(part)}</mark>` : esc(part)))
+      .join('');
+  }
+
+  function snippet(body: string, terms: string[]) {
+    const lower = body.toLowerCase();
+    let pos = -1;
+    for (const t of terms) {
+      pos = lower.indexOf(t);
+      if (pos >= 0) break;
+    }
+    if (pos < 0) return body.slice(0, 90);
+    const start = Math.max(0, pos - 30);
+    return (start > 0 ? '…' : '') + body.slice(start, start + 110);
+  }
+
+  function search(q: string): { e: Entry; score: number; snip: string }[] {
+    const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
+    if (!index) return [];
+    if (!terms.length) return index.slice(0, 8).map((e) => ({ e, score: 0, snip: e.description }));
+    const out = [];
+    for (const e of index) {
+      const fields = {
+        title: e.title.toLowerCase(),
+        meta: [e.category, e.categoryLabel, e.event, ...e.tags].join(' ').toLowerCase(),
+        desc: e.description.toLowerCase(),
+        body: e.body.toLowerCase(),
+      };
+      let score = 0;
+      let ok = true;
+      for (const t of terms) {
+        const s =
+          (fields.title.includes(t) ? 10 : 0) +
+          (fields.meta.includes(t) ? 6 : 0) +
+          (fields.desc.includes(t) ? 3 : 0) +
+          (fields.body.includes(t) ? 1 : 0);
+        if (!s) {
+          ok = false;
+          break;
+        }
+        score += s;
+      }
+      if (ok) {
+        const inBody = !fields.title.includes(terms[0]) && !fields.desc.includes(terms[0]);
+        out.push({ e, score, snip: inBody ? snippet(e.body, terms) : e.description });
+      }
+    }
+    return out.sort((a, b) => b.score - a.score).slice(0, 20);
+  }
+
+  let active = 0;
+
+  function render(dialog: HTMLDialogElement) {
+    const input = dialog.querySelector<HTMLInputElement>('#search-input')!;
+    const list = dialog.querySelector<HTMLUListElement>('#search-results')!;
+    const count = dialog.querySelector<HTMLElement>('#search-count')!;
+    const q = input.value.trim();
+    const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
+    const res = search(q);
+    active = Math.min(active, Math.max(0, res.length - 1));
+    count.textContent = q ? `${res.length} 条结果` : index ? `共 ${index.length} 篇` : '';
+    if (!index) {
+      list.innerHTML = '<li class="r-empty">加载索引中…</li>';
+      return;
+    }
+    if (!res.length) {
+      list.innerHTML = `<li class="r-empty">// 没有找到 “${esc(q)}”<br/>换个关键词试试？</li>`;
+      return;
+    }
+    list.innerHTML = res
+      .map(
+        ({ e, snip }, i) => `
+        <li class="${i === active ? 'active' : ''}" role="option" aria-selected="${i === active}">
+          <a href="${e.url}">
+            <div class="r-title"><span class="badge">${esc(e.categoryLabel)}</span>${highlight(e.title, terms)}</div>
+            <div class="r-snippet">${highlight(snip, terms)}</div>
+          </a>
+        </li>`,
+      )
+      .join('');
+    list.querySelector('li.active')?.scrollIntoView({ block: 'nearest' });
+  }
+
+  async function open() {
+    const dialog = document.getElementById('search-dialog') as HTMLDialogElement | null;
+    if (!dialog || dialog.open) return;
+    dialog.showModal();
+    const input = dialog.querySelector<HTMLInputElement>('#search-input')!;
+    input.select();
+    active = 0;
+    render(dialog);
+    if (!index) {
+      loading ??= fetch(dialog.dataset.index!).then((r) => r.json());
+      index = await loading;
+      render(dialog);
+    }
+  }
+
+  function init() {
+    const dialog = document.getElementById('search-dialog') as HTMLDialogElement | null;
+    if (!dialog) return;
+    const input = dialog.querySelector<HTMLInputElement>('#search-input')!;
+    const list = dialog.querySelector<HTMLUListElement>('#search-results')!;
+
+    document.querySelectorAll('[data-open-search]').forEach((b) => b.addEventListener('click', open));
+    input.addEventListener('input', () => {
+      active = 0;
+      render(dialog);
+    });
+    input.addEventListener('keydown', (e) => {
+      const n = list.querySelectorAll('li[role=option]').length;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (!n) return;
+        active = (active + (e.key === 'ArrowDown' ? 1 : -1) + n) % n;
+        render(dialog);
+      } else if (e.key === 'Enter') {
+        const a = list.querySelector<HTMLAnchorElement>('li.active a');
+        if (a) {
+          e.preventDefault();
+          dialog.close();
+          navigate(a.getAttribute('href')!);
+        }
+      }
+    });
+    list.addEventListener('click', (e) => {
+      const a = (e.target as HTMLElement).closest('a');
+      if (!a) return;
+      e.preventDefault();
+      dialog.close();
+      navigate(a.getAttribute('href')!);
+    });
+    // 点击遮罩关闭
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) dialog.close();
+    });
+  }
+
+  document.addEventListener('keydown', (e) => {
+    const tag = (e.target as HTMLElement)?.tagName;
+    const typing = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable;
+    if ((e.key === 'k' && (e.metaKey || e.ctrlKey)) || (e.key === '/' && !typing)) {
+      e.preventDefault();
+      open();
+    }
+  });
+  document.addEventListener('astro:page-load', init);
+</script>
