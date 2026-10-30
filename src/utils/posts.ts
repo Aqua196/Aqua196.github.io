@@ -1,5 +1,6 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
 import { CATEGORIES } from '../config';
+import { slugify } from './url';
 
 export type Post = CollectionEntry<'posts'>;
 
@@ -20,6 +21,30 @@ export function countBy<T>(items: T[], key: (item: T) => string | string[]): [st
   return [...map.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 }
 
+/**
+ * 按 slug 聚合标签：`Heap` 和 `heap` 算同一个标签，显示用出现次数最多的写法。
+ * 返回值按文章数从多到少排序。
+ */
+export function tagGroups(posts: Post[]) {
+  const groups = new Map<string, { slug: string; names: Map<string, number>; posts: Post[] }>();
+  for (const post of posts) {
+    for (const tag of new Set(post.data.tags)) {
+      const slug = slugify(tag);
+      const g = groups.get(slug) ?? { slug, names: new Map(), posts: [] };
+      g.names.set(tag, (g.names.get(tag) ?? 0) + 1);
+      if (!g.posts.includes(post)) g.posts.push(post);
+      groups.set(slug, g);
+    }
+  }
+  return [...groups.values()]
+    .map(({ slug, names, posts }) => ({
+      slug,
+      name: [...names].sort((a, b) => b[1] - a[1])[0][0],
+      posts,
+    }))
+    .sort((a, b) => b.posts.length - a.posts.length || a.name.localeCompare(b.name));
+}
+
 export function categoryMeta(key: string) {
   return CATEGORIES[key] ?? { label: key };
 }
@@ -36,16 +61,24 @@ export function formatDate(d: Date) {
   return d.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Shanghai' }).replaceAll('/', '-');
 }
 
-/** 去掉 Markdown 语法，用于搜索索引 */
+/**
+ * 去掉 Markdown 语法，用于搜索索引。
+ * - 删掉 `> [!FLAG]` 块和 `<span class="spoiler">`，否则 flag 会从搜索里漏出去
+ * - 保留 `_` 和 `-`：`log_level`、`__free_hook`、`x86-64` 这类标识符要能搜到
+ */
 export function plainText(md = '') {
   return md
     .replace(/^---[\s\S]*?---/, '')
+    .replace(/^>[ \t]*\[!FLAG\][^\n]*(?:\n>[^\n]*)*/gim, '')
+    .replace(/<span[^>]*class=["'][^"']*\bspoiler\b[^"']*["'][^>]*>[\s\S]*?<\/span>/gi, '')
     .replace(/```[^\n]*\n/g, '\n')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/<[^>]+>/g, '')
-    .replace(/^>\s*\[![^\]]+\][+-]?/gm, '')
-    .replace(/[#>*_`~|$\\-]+/g, ' ')
+    .replace(/^>[ \t]*\[![^\]]+\][+-]?/gm, '')
+    .replace(/^[ \t]*(?:[-*+]|\d+\.)[ \t]+/gm, '')
+    .replace(/^[ \t]*(?:#{1,6}|>+)[ \t]*/gm, '')
+    .replace(/[*`~|$\\]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }

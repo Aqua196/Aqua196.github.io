@@ -65,9 +65,17 @@ const isActive = (href: string) => {
     display: flex;
     align-items: center;
     gap: 0.6rem;
+    min-width: 0;
     font-size: 0.92rem;
     font-weight: 700;
     white-space: nowrap;
+  }
+  .logo > :not(.mark) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mark {
+    flex: none;
   }
   .mark {
     display: grid;
@@ -192,10 +200,18 @@ const isActive = (href: string) => {
       background: var(--bg);
       border-bottom: 1px solid var(--fg);
       clip-path: inset(0 0 100% 0);
-      transition: clip-path 0.3s var(--ease);
+      /* 收起时用 visibility 真正隐藏：Tab 不会跳进去，读屏也读不到 */
+      visibility: hidden;
+      transition:
+        clip-path 0.3s var(--ease),
+        visibility 0s 0.3s;
     }
     .links.open {
       clip-path: inset(0 0 0 0);
+      visibility: visible;
+      transition:
+        clip-path 0.3s var(--ease),
+        visibility 0s;
     }
     .links a {
       padding: 0.9rem 16px;
@@ -204,6 +220,19 @@ const isActive = (href: string) => {
     }
     .actions {
       margin-left: auto;
+    }
+    .bar {
+      gap: 0.75rem;
+    }
+  }
+  @media (max-width: 420px) {
+    .dim {
+      display: none;
+    }
+    .act {
+      min-width: 32px;
+      height: 32px;
+      padding: 0 0.45rem;
     }
   }
 </style>
@@ -214,10 +243,32 @@ const isActive = (href: string) => {
     const links = document.getElementById('nav-links');
     const themeBtn = document.getElementById('theme-toggle');
 
-    menuBtn?.addEventListener('click', () => {
-      const open = links?.classList.toggle('open') ?? false;
-      menuBtn.setAttribute('aria-expanded', String(open));
-    });
+    const setOpen = (open: boolean) => {
+      links?.classList.toggle('open', open);
+      menuBtn?.setAttribute('aria-expanded', String(open));
+    };
+    menuBtn?.addEventListener('click', () => setOpen(!links?.classList.contains('open')));
+    // Esc、点菜单外面都能收起
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && links?.classList.contains('open')) {
+        setOpen(false);
+        menuBtn?.focus();
+      }
+    };
+    const onClick = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (links?.classList.contains('open') && !links.contains(t) && !menuBtn?.contains(t)) setOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('click', onClick);
+    document.addEventListener(
+      'astro:before-swap',
+      () => {
+        document.removeEventListener('keydown', onKey);
+        document.removeEventListener('click', onClick);
+      },
+      { once: true },
+    );
 
     themeBtn?.addEventListener('click', (e) => {
       const root = document.documentElement;

@@ -28,9 +28,9 @@ npm run new -- hitcon-2026-babyheap pwn
 
 这条命令会创建 `src/content/posts/hitcon-2026-babyheap.md`，默认是草稿（`draft: true`）。草稿在 `npm run dev` 里能看到，但不会发布到线上。写完把它改成 `false` 就行。
 
-文件名就是文章网址，建议用英文和短横线。需要图片的话，可以建一个文件夹，把 `index.md` 和图片放在一起，再用 `![](./xxx.png)` 引用。
+文件名就是文章网址，建议用英文和短横线。需要图片的话，可以建一个文件夹，把 `index.md` 和图片放在一起，再用 `![](./xxx.png)` 引用。注意要用 Markdown 的图片写法，HTML 的 `<img src="./xxx.png">` 不会被处理。
 
-所有写法（frontmatter 字段、提示块、Flag 打码、代码标题、公式）都在示例文章 **「博客使用指南 & Markdown 功能演示」**（`src/content/posts/getting-started.md`）里。`demo-*.md` 是示例 writeup，熟悉以后可以直接删掉。
+所有写法（frontmatter 字段、提示块、Flag 打码、代码标题、公式）都在 **「博客使用指南 & Markdown 功能演示」**（`src/content/posts/getting-started.md`）里。它和 `demo-*.md` 几篇示例 writeup 都是草稿，只在 `npm run dev` 时显示，不会发布；熟悉以后可以直接删掉。
 
 ## 改成你自己的信息
 

@@ -1,5 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
+import Empty from '../components/Empty.astro';
 import { getPosts, categoryMeta, formatDate } from '../utils/posts';
 import { postUrl } from '../utils/url';
 
@@ -19,6 +20,7 @@ for (const p of posts) {
       <p data-reveal style="--delay:.1s">共 {posts.length} 篇，按时间倒序。</p>
     </header>
 
+    {posts.length === 0 && <Empty cmd="git log --oneline" />}
     {
       [...byYear].map(([year, list]) => (
         <section class="year">

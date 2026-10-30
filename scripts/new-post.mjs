@@ -24,11 +24,11 @@ writeFileSync(
   `---
 title: ${slug}
 date: ${today}
-description:
+description: ''
 category: ${category}
 tags: []
-event:
-difficulty: 3
+# event: 比赛 / 平台名
+# difficulty: 3
 draft: true
 ---
 

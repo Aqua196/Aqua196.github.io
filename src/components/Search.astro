@@ -6,14 +6,25 @@ import { url } from '../utils/url';
   <div class="panel">
     <div class="input-row">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
-      <input id="search-input" type="search" placeholder="搜索标题、标签、正文、exp…" autocomplete="off" spellcheck="false" />
+      <input
+        id="search-input"
+        type="search"
+        placeholder="搜索标题、标签、正文、exp…"
+        aria-label="搜索文章"
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded="true"
+        aria-controls="search-results"
+        autocomplete="off"
+        spellcheck="false"
+      />
       <kbd>ESC</kbd>
     </div>
-    <ul id="search-results" class="results" role="listbox"></ul>
+    <ul id="search-results" class="results" role="listbox" aria-label="搜索结果"></ul>
     <div class="foot mono">
       <span><kbd>↑</kbd><kbd>↓</kbd> 选择</span>
       <span><kbd>↵</kbd> 打开</span>
-      <span class="count" id="search-count"></span>
+      <span class="count" id="search-count" aria-live="polite"></span>
     </div>
   </div>
 </dialog>
@@ -107,6 +118,20 @@ import { url } from '../utils/url';
     text-decoration-thickness: 2px;
     text-underline-offset: 3px;
   }
+  .results :global(.r-empty button) {
+    margin-top: 0.8rem;
+    padding: 0.3rem 0.8rem;
+    border: 1px solid var(--fg);
+    background: transparent;
+    color: var(--fg);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+  .results :global(.r-empty button:hover) {
+    background: var(--fg);
+    color: var(--bg);
+  }
   .results :global(.r-empty) {
     padding: 2rem 1rem;
     text-align: center;
@@ -144,114 +169,169 @@ import { url } from '../utils/url';
     date: string;
     body: string;
   };
+  type Prepared = Entry & { f: { title: string; meta: string; desc: string; body: string } };
 
-  let index: Entry[] | null = null;
-  let loading: Promise<Entry[]> | null = null;
+  let index: Prepared[] | null = null;
+  let loading: Promise<void> | null = null;
+  let failed = false;
+  let active = 0;
 
   const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-  const escRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-  function highlight(text: string, terms: string[]) {
-    if (!terms.length) return esc(text);
-    const re = new RegExp(`(${terms.map(escRe).join('|')})`, 'gi');
-    return text
-      .split(re)
-      .map((part, i) => (i % 2 ? `<mark>${esc(part)}</mark>` : esc(part)))
-      .join('');
+  /**
+   * 搜索用的归一化：小写 + 去掉重音（Håstad → hastad）。
+   * 逐字符处理并保持长度不变，这样在归一化文本里找到的位置可以直接用来高亮原文。
+   */
+  function fold(s: string) {
+    let out = '';
+    for (const ch of s) {
+      const lower = ch.toLowerCase();
+      const base = lower.normalize('NFKD').replace(/\p{M}/gu, '');
+      if (base.length === ch.length) out += base;
+      else if (lower.length === ch.length) out += lower;
+      else out += ch;
+    }
+    return out;
   }
 
-  function snippet(body: string, terms: string[]) {
-    const lower = body.toLowerCase();
+  const terms = (q: string) => fold(q).split(/\s+/).filter(Boolean);
+
+  function highlight(text: string, ts: string[]) {
+    if (!ts.length) return esc(text);
+    const folded = fold(text);
+    const ranges: [number, number][] = [];
+    for (const t of ts) {
+      for (let i = folded.indexOf(t); i >= 0; i = folded.indexOf(t, i + t.length)) ranges.push([i, i + t.length]);
+    }
+    ranges.sort((a, b) => a[0] - b[0]);
+    let html = '';
+    let pos = 0;
+    for (const [a, b] of ranges) {
+      if (a < pos) continue;
+      html += esc(text.slice(pos, a)) + `<mark>${esc(text.slice(a, b))}</mark>`;
+      pos = b;
+    }
+    return html + esc(text.slice(pos));
+  }
+
+  function snippet(e: Prepared, ts: string[]) {
     let pos = -1;
-    for (const t of terms) {
-      pos = lower.indexOf(t);
+    for (const t of ts) {
+      pos = e.f.body.indexOf(t);
       if (pos >= 0) break;
     }
-    if (pos < 0) return body.slice(0, 90);
+    if (pos < 0) return e.body.slice(0, 90);
     const start = Math.max(0, pos - 30);
-    return (start > 0 ? '…' : '') + body.slice(start, start + 110);
+    return (start > 0 ? '…' : '') + e.body.slice(start, start + 110);
   }
 
-  function search(q: string): { e: Entry; score: number; snip: string }[] {
-    const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
+  function search(q: string) {
     if (!index) return [];
-    if (!terms.length) return index.slice(0, 8).map((e) => ({ e, score: 0, snip: e.description }));
-    const out = [];
+    const ts = terms(q);
+    if (!ts.length) return index.slice(0, 8).map((e) => ({ e, snip: e.description }));
+    const out: { e: Prepared; score: number; snip: string }[] = [];
     for (const e of index) {
-      const fields = {
-        title: e.title.toLowerCase(),
-        meta: [e.category, e.categoryLabel, e.event, ...e.tags].join(' ').toLowerCase(),
-        desc: e.description.toLowerCase(),
-        body: e.body.toLowerCase(),
-      };
       let score = 0;
-      let ok = true;
-      for (const t of terms) {
+      for (const t of ts) {
         const s =
-          (fields.title.includes(t) ? 10 : 0) +
-          (fields.meta.includes(t) ? 6 : 0) +
-          (fields.desc.includes(t) ? 3 : 0) +
-          (fields.body.includes(t) ? 1 : 0);
+          (e.f.title.includes(t) ? 10 : 0) +
+          (e.f.meta.includes(t) ? 6 : 0) +
+          (e.f.desc.includes(t) ? 3 : 0) +
+          (e.f.body.includes(t) ? 1 : 0);
         if (!s) {
-          ok = false;
+          score = 0;
           break;
         }
         score += s;
       }
-      if (ok) {
-        const inBody = !fields.title.includes(terms[0]) && !fields.desc.includes(terms[0]);
-        out.push({ e, score, snip: inBody ? snippet(e.body, terms) : e.description });
-      }
+      if (!score) continue;
+      const inBody = !e.f.title.includes(ts[0]) && !e.f.desc.includes(ts[0]);
+      out.push({ e, score, snip: inBody ? snippet(e, ts) : e.description });
     }
     return out.sort((a, b) => b.score - a.score).slice(0, 20);
   }
 
-  let active = 0;
+  async function loadIndex(url: string) {
+    try {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data: Entry[] = await r.json();
+      index = data.map((e) => ({
+        ...e,
+        f: {
+          title: fold(e.title),
+          meta: fold([e.category, e.categoryLabel, e.event, ...e.tags].join(' ')),
+          desc: fold(e.description),
+          body: fold(e.body),
+        },
+      }));
+      failed = false;
+    } catch {
+      failed = true;
+    }
+  }
+
+  function ensureIndex(dialog: HTMLDialogElement) {
+    if (index) return;
+    loading ??= loadIndex(dialog.dataset.index!).finally(() => {
+      loading = null;
+      render(dialog);
+    });
+  }
 
   function render(dialog: HTMLDialogElement) {
     const input = dialog.querySelector<HTMLInputElement>('#search-input')!;
     const list = dialog.querySelector<HTMLUListElement>('#search-results')!;
     const count = dialog.querySelector<HTMLElement>('#search-count')!;
     const q = input.value.trim();
-    const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
+    input.removeAttribute('aria-activedescendant');
+
+    if (!index) {
+      count.textContent = '';
+      list.innerHTML = failed
+        ? '<li class="r-empty">// 搜索索引加载失败<br/><button type="button" class="retry">重试</button></li>'
+        : '<li class="r-empty">加载索引中…</li>';
+      return;
+    }
+
     const res = search(q);
     active = Math.min(active, Math.max(0, res.length - 1));
-    count.textContent = q ? `${res.length} 条结果` : index ? `共 ${index.length} 篇` : '';
-    if (!index) {
-      list.innerHTML = '<li class="r-empty">加载索引中…</li>';
-      return;
-    }
+    count.textContent = q ? `${res.length} 条结果` : `共 ${index.length} 篇`;
     if (!res.length) {
-      list.innerHTML = `<li class="r-empty">// 没有找到 “${esc(q)}”<br/>换个关键词试试？</li>`;
+      list.innerHTML = q
+        ? `<li class="r-empty">// 没有找到 “${esc(q)}”<br/>换个关键词试试？</li>`
+        : '<li class="r-empty">// 还没有文章</li>';
       return;
     }
+    const ts = terms(q);
     list.innerHTML = res
       .map(
         ({ e, snip }, i) => `
-        <li class="${i === active ? 'active' : ''}" role="option" aria-selected="${i === active}">
-          <a href="${e.url}">
-            <div class="r-title"><span class="badge">${esc(e.categoryLabel)}</span>${highlight(e.title, terms)}</div>
-            <div class="r-snippet">${highlight(snip, terms)}</div>
+        <li id="search-opt-${i}" class="${i === active ? 'active' : ''}" role="option" aria-selected="${i === active}">
+          <a href="${e.url}" tabindex="-1">
+            <div class="r-title"><span class="badge">${esc(e.categoryLabel)}</span><span>${highlight(e.title, ts)}</span></div>
+            <div class="r-snippet">${highlight(snip, ts)}</div>
           </a>
         </li>`,
       )
       .join('');
+    input.setAttribute('aria-activedescendant', `search-opt-${active}`);
     list.querySelector('li.active')?.scrollIntoView({ block: 'nearest' });
   }
 
-  async function open() {
+  function open() {
     const dialog = document.getElementById('search-dialog') as HTMLDialogElement | null;
     if (!dialog || dialog.open) return;
     dialog.showModal();
-    const input = dialog.querySelector<HTMLInputElement>('#search-input')!;
-    input.select();
+    dialog.querySelector<HTMLInputElement>('#search-input')!.select();
     active = 0;
     render(dialog);
-    if (!index) {
-      loading ??= fetch(dialog.dataset.index!).then((r) => r.json());
-      index = await loading;
-      render(dialog);
-    }
+    ensureIndex(dialog);
+  }
+
+  function go(dialog: HTMLDialogElement, href: string) {
+    dialog.close();
+    navigate(href);
   }
 
   function init() {
@@ -276,17 +356,22 @@ import { url } from '../utils/url';
         const a = list.querySelector<HTMLAnchorElement>('li.active a');
         if (a) {
           e.preventDefault();
-          dialog.close();
-          navigate(a.getAttribute('href')!);
+          go(dialog, a.getAttribute('href')!);
         }
       }
     });
     list.addEventListener('click', (e) => {
-      const a = (e.target as HTMLElement).closest('a');
+      const target = e.target as HTMLElement;
+      if (target.closest('.retry')) {
+        failed = false;
+        render(dialog);
+        ensureIndex(dialog);
+        return;
+      }
+      const a = target.closest('a');
       if (!a) return;
       e.preventDefault();
-      dialog.close();
-      navigate(a.getAttribute('href')!);
+      go(dialog, a.getAttribute('href')!);
     });
     // 点击遮罩关闭
     dialog.addEventListener('click', (e) => {
@@ -295,8 +380,8 @@ import { url } from '../utils/url';
   }
 
   document.addEventListener('keydown', (e) => {
-    const tag = (e.target as HTMLElement)?.tagName;
-    const typing = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable;
+    const el = e.target as HTMLElement;
+    const typing = el?.tagName === 'INPUT' || el?.tagName === 'TEXTAREA' || el?.isContentEditable;
     if ((e.key === 'k' && (e.metaKey || e.ctrlKey)) || (e.key === '/' && !typing)) {
       e.preventDefault();
       open();

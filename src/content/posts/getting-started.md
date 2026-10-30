@@ -4,10 +4,10 @@ date: 2026-10-30
 description: 写 writeup 之前先看这篇：frontmatter 字段、提示块、Flag 打码、代码窗口、数学公式……所有功能一页看完。
 category: misc
 tags: [博客, 指南]
-pinned: true
+draft: true
 ---
 
-这篇文章既是**使用说明**，也是**功能演示**。把它删掉或者设成 `draft: true` 就不会出现在网站上了。
+这篇文章既是**使用说明**，也是**功能演示**。它是草稿（`draft: true`），只在本地 `npm run dev` 时能看到，不会发布到网站上。
 
 ## 新建一篇文章
 
@@ -23,7 +23,7 @@ src/content/posts/hitcon-2026-babyheap.md   →   /posts/hitcon-2026-babyheap/
 npm run new -- hitcon-2026-babyheap
 ```
 
-如果文章有图片，可以建一个同名文件夹，把图片和 `index.md` 放在一起，然后用相对路径引用 `![](./heap.png)`。
+如果文章有图片，可以建一个同名文件夹，把图片和 `index.md` 放在一起，然后用相对路径引用 `![](./heap.png)`。注意要用 Markdown 的图片写法，HTML 的 `<img src="./heap.png">` 不会被处理，图片会显示不出来。
 
 ## Frontmatter 字段
 
@@ -81,10 +81,9 @@ draft: false                     # 草稿，不会发布
 
 ## Flag 打码
 
-`FLAG` 类型的提示块默认被黑条涂掉，读者点一下才会显示，防止“剧透”：
+`FLAG` 类型的提示块默认被黑条盖住，读者点一下（或用键盘按回车）才会显示，防止“剧透”。flag 写在 `[!FLAG]` 同一行也可以：
 
-> [!FLAG]
-> flag{th1s_1s_4_d3m0_fl4g}
+> [!FLAG] flag{th1s_1s_4_d3m0_fl4g}
 
 行内也可以打码：答案是 <span class="spoiler">42</span>（点一下）。写法是 `<span class="spoiler">42</span>`。
 

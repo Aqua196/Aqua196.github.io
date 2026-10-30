@@ -11,7 +11,7 @@ import rehypeCodeWindow from './src/plugins/rehype-code-window.mjs';
 // 在 GitHub Actions 里，SITE / BASE_PATH 由 actions/configure-pages 自动给出，
 // 所以无论仓库叫 <用户名>.github.io 还是别的名字都能正确部署。
 // 本地开发时用下面的默认值即可。
-const site = process.env.SITE ?? 'https://example.github.io';
+const site = process.env.SITE || 'https://aqua196.github.io';
 const base = process.env.BASE_PATH || '/';
 
 export default defineConfig({
@@ -28,6 +28,7 @@ export default defineConfig({
     processor: unified({
       remarkPlugins: [remarkMath, remarkCallouts, remarkCodeTitle],
       rehypePlugins: [[rehypeKatex, { strict: false }], rehypeCodeWindow],
+      remarkRehype: { footnoteLabel: '脚注', footnoteBackLabel: '返回正文' },
     }),
   },
   prefetch: { prefetchAll: true, defaultStrategy: 'hover' },

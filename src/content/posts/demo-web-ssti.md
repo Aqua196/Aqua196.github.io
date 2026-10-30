@@ -8,6 +8,7 @@ event: DemoCTF 2026
 difficulty: 2
 points: 150
 solves: 128
+draft: true
 ---
 
 > [!NOTE]

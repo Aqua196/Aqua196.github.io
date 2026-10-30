@@ -17,13 +17,20 @@ export default function remarkCallouts() {
       if (!m) return;
 
       const type = m[1].toLowerCase();
-      const fold = m[2];
-      const title = m[3].trim() || (fold ? '点击展开' : '');
+      const isFlag = type === 'flag';
+      const fold = isFlag ? '-' : m[2];
 
-      text.value = text.value.slice(m[0].length);
+      if (isFlag) {
+        // FLAG 不支持标题：`> [!FLAG] flag{...}` 同一行写的内容也当作正文，一样被盖住
+        text.value = text.value.slice(m[0].length - m[3].length - (m[0].endsWith('\n') ? 1 : 0));
+        text.value = text.value.replace(/^\s+/, '');
+      } else {
+        text.value = text.value.slice(m[0].length);
+      }
       if (!text.value) first.children.shift();
       if (first.children.length === 0) node.children.shift();
 
+      const title = isFlag ? '' : m[3].trim() || (fold ? '点击展开' : '');
       const collapsible = fold !== '';
       node.data = {
         hName: collapsible ? 'details' : 'div',
@@ -44,6 +51,21 @@ export default function remarkCallouts() {
               children: [{ type: 'text', value: type.toUpperCase() }],
             },
             ...(title ? [{ type: 'text', value: title }] : []),
+            // FLAG 收起时显示一根“涂黑”的条
+            ...(isFlag
+              ? [
+                  {
+                    type: 'calloutRedact',
+                    data: { hName: 'span', hProperties: { className: ['callout-redact'], ariaHidden: 'true' } },
+                    children: [],
+                  },
+                  {
+                    type: 'calloutHint',
+                    data: { hName: 'span', hProperties: { className: ['callout-hint'] } },
+                    children: [{ type: 'text', value: '点击查看' }],
+                  },
+                ]
+              : []),
           ],
         },
         {

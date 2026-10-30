@@ -2,7 +2,7 @@ import rss from '@astrojs/rss';
 import type { APIContext } from 'astro';
 import { SITE } from '../config';
 import { getPosts } from '../utils/posts';
-import { postUrl } from '../utils/url';
+import { postUrl, url } from '../utils/url';
 
 export async function GET(context: APIContext) {
   const posts = await getPosts();
@@ -17,6 +17,10 @@ export async function GET(context: APIContext) {
       link: postUrl(p.id),
       categories: [p.data.category, ...p.data.tags],
     })),
-    customData: `<language>${SITE.lang}</language>`,
+    xmlns: { atom: 'http://www.w3.org/2005/Atom' },
+    customData: [
+      `<language>${SITE.lang}</language>`,
+      `<atom:link href="${new URL(url('/rss.xml'), context.site)}" rel="self" type="application/rss+xml" />`,
+    ].join(''),
   });
 }

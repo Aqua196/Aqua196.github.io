@@ -13,9 +13,14 @@ interface Props {
   title?: string;
   description?: string;
   type?: 'website' | 'article';
+  /** 文章的发布 / 更新时间，用于分享卡片 */
+  published?: Date;
+  modified?: Date;
+  /** 不让搜索引擎收录（404 页） */
+  noindex?: boolean;
 }
 
-const { title, description = SITE.description, type = 'website' } = Astro.props;
+const { title, description = SITE.description, type = 'website', published, modified, noindex = false } = Astro.props;
 const fullTitle = title ? `${title} | ${SITE.title}` : `${SITE.title} — ${SITE.author}`;
 const canonical = new URL(Astro.url.pathname, Astro.site);
 ---
@@ -27,17 +32,20 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
-    <link rel="canonical" href={canonical} />
+    {noindex ? <meta name="robots" content="noindex" /> : <link rel="canonical" href={canonical} />}
     <link rel="icon" type="image/svg+xml" href={url('/favicon.svg')} />
     <link rel="alternate" type="application/rss+xml" title={SITE.title} href={url('/rss.xml')} />
     <link rel="sitemap" href={url('/sitemap-index.xml')} />
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0a0a" />
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fafaf8" />
+    <meta name="theme-color" content="#0a0a0a" />
     <meta property="og:type" content={type} />
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
-    <meta property="og:url" content={canonical} />
+    {!noindex && <meta property="og:url" content={canonical} />}
     <meta property="og:site_name" content={SITE.title} />
+    <meta property="og:locale" content={SITE.lang.replace('-', '_')} />
+    {published && <meta property="article:published_time" content={published.toISOString()} />}
+    {modified && <meta property="article:modified_time" content={modified.toISOString()} />}
+    <meta name="twitter:card" content="summary" />
     <meta name="generator" content={Astro.generator} />
 
     <!-- 在首帧渲染前应用主题，避免闪烁：优先用户选择，其次跟随系统 -->
@@ -54,11 +62,18 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
           }
           root.dataset.theme = t;
           root.classList.add('js');
+          syncThemeColor();
+        }
+        // 浏览器地址栏颜色跟着当前主题走（包括手动切换的情况）
+        function syncThemeColor() {
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', root.dataset.theme === 'light' ? '#fafaf8' : '#0a0a0a');
         }
         apply();
         if (!window.__themeHooked) {
           window.__themeHooked = true;
           document.addEventListener('astro:after-swap', apply);
+          new MutationObserver(syncThemeColor).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
         }
       })();
     </script>
@@ -73,6 +88,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <Footer />
     <Search />
     <BackToTop />
+    <p class="sr-only" id="copy-status" aria-live="polite"></p>
   </body>
 </html>
 
@@ -129,7 +145,49 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     document.querySelectorAll<HTMLElement>('[data-scramble-load]').forEach(scramble);
   });
 
-  // ---------- 代码复制 / Flag 揭示 / 图片放大 ----------
+  // ---------- 行内打码：让键盘和读屏也能用 ----------
+  function initSpoilers() {
+    document.querySelectorAll<HTMLElement>('.spoiler:not(.revealed)').forEach((el) => {
+      el.setAttribute('role', 'button');
+      el.setAttribute('tabindex', '0');
+      el.setAttribute('aria-label', '被隐藏的内容，按回车显示');
+    });
+  }
+  function reveal(el: HTMLElement) {
+    el.classList.add('revealed');
+    el.removeAttribute('role');
+    el.removeAttribute('tabindex');
+    el.removeAttribute('aria-label');
+  }
+  document.addEventListener('astro:page-load', initSpoilers);
+  document.addEventListener('keydown', (e) => {
+    const el = e.target as HTMLElement;
+    if ((e.key === 'Enter' || e.key === ' ') && el.classList?.contains('spoiler') && !el.classList.contains('revealed')) {
+      e.preventDefault();
+      reveal(el);
+    }
+  });
+
+  // ---------- 图片放大：用 <dialog>，自带 Esc 关闭和焦点管理 ----------
+  function openLightbox(img: HTMLImageElement) {
+    const box = document.createElement('dialog');
+    box.className = 'lightbox';
+    box.setAttribute('aria-label', img.alt || '图片');
+    const big = document.createElement('img');
+    big.src = img.currentSrc || img.src;
+    big.alt = img.alt;
+    box.append(big);
+    document.body.append(box);
+    document.documentElement.classList.add('lightbox-open');
+    box.addEventListener('click', () => box.close());
+    box.addEventListener('close', () => {
+      document.documentElement.classList.remove('lightbox-open');
+      box.remove();
+    });
+    box.showModal();
+  }
+
+  // ---------- 代码复制 / 打码揭示 / 图片放大 ----------
   document.addEventListener('click', async (e) => {
     const target = e.target as HTMLElement;
 
@@ -138,33 +196,29 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
       const code = copyBtn.closest('.code-window')?.querySelector('pre code') as HTMLElement | null;
       if (!code) return;
       const text = [...code.querySelectorAll('.line')].map((l) => l.textContent).join('\n') || code.innerText;
+      const status = document.getElementById('copy-status');
       try {
         await navigator.clipboard.writeText(text);
         copyBtn.textContent = 'copied';
+        if (status) status.textContent = '代码已复制';
       } catch {
         copyBtn.textContent = 'failed';
+        if (status) status.textContent = '复制失败';
       }
-      setTimeout(() => (copyBtn.textContent = 'copy'), 1500);
+      setTimeout(() => {
+        copyBtn.textContent = 'copy';
+        if (status) status.textContent = '';
+      }, 1500);
       return;
     }
 
-    const secret = target.closest<HTMLElement>('.callout-flag .callout-body, .spoiler');
-    if (secret && !secret.classList.contains('revealed')) {
-      secret.classList.add('revealed');
+    const spoiler = target.closest<HTMLElement>('.spoiler');
+    if (spoiler && !spoiler.classList.contains('revealed')) {
+      reveal(spoiler);
       return;
     }
 
     const img = target.closest<HTMLImageElement>('.prose img');
-    if (img && !img.closest('a')) {
-      const box = document.createElement('div');
-      box.className = 'lightbox';
-      box.innerHTML = `<img src="${img.currentSrc || img.src}" alt="">`;
-      box.addEventListener('click', () => {
-        box.classList.remove('show');
-        setTimeout(() => box.remove(), 250);
-      });
-      document.body.append(box);
-      requestAnimationFrame(() => box.classList.add('show'));
-    }
+    if (img && !img.closest('a')) openLightbox(img);
   });
 </script>

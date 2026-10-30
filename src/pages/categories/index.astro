@@ -1,5 +1,6 @@
 ---
 import Base from '../../layouts/Base.astro';
+import Empty from '../../components/Empty.astro';
 import { getPosts, countBy, categoryMeta } from '../../utils/posts';
 import { categoryUrl, postUrl } from '../../utils/url';
 
@@ -15,6 +16,7 @@ const cats = countBy(posts, (p) => p.data.category);
       <p data-reveal style="--delay:.1s">{cats.length} 个方向。</p>
     </header>
 
+    {cats.length === 0 && <Empty cmd="ls ./categories" />}
     <div class="grid" data-reveal style="--delay:.15s">
       {
         cats.map(([key, n]) => {
@@ -41,6 +43,9 @@ const cats = countBy(posts, (p) => p.data.category);
 </Base>
 
 <style>
+  .grid:not(:has(*)) {
+    display: none;
+  }
   .grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));

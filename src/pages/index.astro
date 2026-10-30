@@ -2,17 +2,18 @@
 import Base from '../layouts/Base.astro';
 import Hero from '../components/Hero.astro';
 import PostRow from '../components/PostRow.astro';
+import Empty from '../components/Empty.astro';
 import { SITE } from '../config';
-import { getHomePosts, countBy, categoryMeta } from '../utils/posts';
+import { getHomePosts, countBy, categoryMeta, tagGroups } from '../utils/posts';
 import { url, categoryUrl, tagUrl } from '../utils/url';
 
 const posts = await getHomePosts();
 const categories = countBy(posts, (p) => p.data.category);
-const tags = countBy(posts, (p) => p.data.tags);
+const tags = tagGroups(posts);
 const latest = posts.slice(0, SITE.homePostCount);
 
-// 跑马灯：标签不够多就重复几遍
-let ticker = tags.map(([t]) => t);
+// 跑马灯：用标签，还没有标签时用首页标语；不够长就重复几遍
+let ticker = tags.length ? tags.map((t) => t.name) : [...SITE.taglines];
 while (ticker.length > 0 && ticker.length < 14) ticker = ticker.concat(ticker);
 ---
 
@@ -35,22 +36,27 @@ while (ticker.length > 0 && ticker.length < 14) ticker = ticker.concat(ticker);
     )
   }
 
-  <section class="container block">
-    <div class="section-head" data-reveal>
-      <h2><span data-scramble>Index</span><span class="zh">分类</span></h2>
-      <a href={url('/categories')}>all categories →</a>
-    </div>
-    <div class="cats" data-reveal>
-      {
-        categories.map(([key, n]) => (
-          <a href={categoryUrl(key)}>
-            <span class="name mono">{categoryMeta(key).label}</span>
-            <span class="n mono">{String(n).padStart(2, '0')}</span>
-          </a>
-        ))
-      }
-    </div>
-  </section>
+  {
+    categories.length > 0 && (
+      <section class="container block">
+        <div class="section-head" data-reveal>
+          <h2>
+            <span data-scramble>Index</span>
+            <span class="zh">分类</span>
+          </h2>
+          <a href={url('/categories')}>all categories →</a>
+        </div>
+        <div class="cats" data-reveal>
+          {categories.map(([key, n]) => (
+            <a href={categoryUrl(key)}>
+              <span class="name mono">{categoryMeta(key).label}</span>
+              <span class="n mono">{String(n).padStart(2, '0')}</span>
+            </a>
+          ))}
+        </div>
+      </section>
+    )
+  }
 
   <section class="container block" id="latest">
     <div class="section-head" data-reveal>
@@ -65,7 +71,7 @@ while (ticker.length > 0 && ticker.length < 14) ticker = ticker.concat(ticker);
           ))}
         </ol>
       ) : (
-        <p class="empty mono">// 还没有文章，去 src/content/posts/ 写第一篇吧</p>
+        <Empty>第一篇 writeup 正在路上。</Empty>
       )
     }
     {
@@ -90,10 +96,10 @@ while (ticker.length > 0 && ticker.length < 14) ticker = ticker.concat(ticker);
           <a href={url('/tags')}>all tags →</a>
         </div>
         <div class="tags mono" data-reveal>
-          {tags.slice(0, 30).map(([t, n]) => (
-            <a href={tagUrl(t)}>
-              #{t}
-              <sup>{n}</sup>
+          {tags.slice(0, 30).map((t) => (
+            <a href={tagUrl(t.name)}>
+              #{t.name}
+              <sup>{t.posts.length}</sup>
             </a>
           ))}
         </div>
@@ -107,12 +113,14 @@ while (ticker.length > 0 && ticker.length < 14) ticker = ticker.concat(ticker);
     margin-top: 5rem;
   }
 
-  /* ---------- 反色跑马灯 ---------- */
+  /* ---------- 标签跑马灯：上下两条细线夹住的一行等宽字 ---------- */
   .ticker {
     overflow: hidden;
-    background: var(--fg);
-    color: var(--bg);
-    padding: 0.7rem 0;
+    border-block: 1px solid var(--line-2);
+    color: var(--fg-2);
+    padding: 0.85rem 0;
+    mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
   }
   .track {
     display: flex;
@@ -129,9 +137,11 @@ while (ticker.length > 0 && ticker.length < 14) ticker = ticker.concat(ticker);
     white-space: nowrap;
   }
   .row span::after {
-    content: '/';
-    margin: 0 1.4rem;
-    opacity: 0.4;
+    content: '✕';
+    margin: 0 1.6rem;
+    font-size: 0.6em;
+    vertical-align: 0.2em;
+    color: var(--muted);
   }
   @keyframes marquee {
     to {
@@ -142,7 +152,7 @@ while (ticker.length > 0 && ticker.length < 14) ticker = ticker.concat(ticker);
   /* ---------- 分类 ---------- */
   .cats {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
     border-top: 1px solid var(--line);
     border-left: 1px solid var(--line);
   }
@@ -173,9 +183,6 @@ while (ticker.length > 0 && ticker.length < 14) ticker = ticker.concat(ticker);
 
   .more {
     margin-top: 2rem;
-  }
-  .empty {
-    color: var(--muted);
   }
 
   .tags {

@@ -3,10 +3,10 @@ import Base from '../layouts/Base.astro';
 import { url } from '../utils/url';
 ---
 
-<Base title="404">
+<Base title="404" noindex>
   <div class="container wrap">
     <h1 class="mono"><span data-scramble data-scramble-load>404</span></h1>
-    <pre class="term mono">$ curl {Astro.url.pathname}
+    <pre class="term mono">$ curl <span id="missing-path">this-page</span>
 Segmentation fault (core dumped)
 
 [!] 页面不存在，或者已经被 free 掉了。</pre>
@@ -35,3 +35,11 @@ Segmentation fault (core dumped)
     white-space: pre-wrap;
   }
 </style>
+
+<script>
+  // 404 页是同一个静态文件，访问的真实路径只能在浏览器里拿到
+  document.addEventListener('astro:page-load', () => {
+    const el = document.getElementById('missing-path');
+    if (el) el.textContent = decodeURI(location.pathname);
+  });
+</script>
