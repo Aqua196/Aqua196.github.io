@@ -6,7 +6,7 @@ export const SITE = {
   /** 浏览器标签页 / RSS 里显示的站点名 */
   title: 'Writeup Lab',
   /** 首页大标题（可以写你的 ID） */
-  author: 'h4ck3r',
+  author: 'Aqua196',
   /** 一句话介绍，用于 SEO 和首页 */
   description: '记录 CTF 与算法题的解题思路、踩坑和 exp。',
   /** 首页大标题下的一行小字 */
@@ -28,7 +28,7 @@ export const SITE = {
 
 /** 社交链接，留空字符串的项不会显示 */
 export const SOCIALS = {
-  github: 'https://github.com/',
+  github: 'https://github.com/Aqua196',
   email: '',
   twitter: '',
   bilibili: '',
