@@ -27,6 +27,8 @@ interface Props {
 const { title, description = SITE.description, type = 'website', published, modified, noindex = false } = Astro.props;
 const fullTitle = title ? `${title} | ${SITE.title}` : `${SITE.title} — ${SITE.author}`;
 const canonical = new URL(Astro.url.pathname, Astro.site);
+// 分享卡片用的图：public/og.png（1200×630）
+const ogImage = new URL(url('/og.png'), Astro.site);
 ---
 
 <!doctype html>
@@ -49,7 +51,11 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <meta property="og:locale" content={SITE.lang.replace('-', '_')} />
     {published && <meta property="article:published_time" content={published.toISOString()} />}
     {modified && <meta property="article:modified_time" content={modified.toISOString()} />}
-    <meta name="twitter:card" content="summary" />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content={ogImage} />
     <meta name="generator" content={Astro.generator} />
 
     <!-- 在首帧渲染前应用主题，避免闪烁：优先用户选择，其次跟随系统 -->
@@ -85,8 +91,9 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <slot name="head" />
   </head>
   <body>
+    <a class="skip" href="#main">跳到正文</a>
     <Header />
-    <main>
+    <main id="main" tabindex="-1">
       <slot />
     </main>
     <Footer />
@@ -176,6 +183,24 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
   });
 
   // ---------- 图片放大：用 <dialog>，自带 Esc 关闭和焦点管理 ----------
+  // 支持 View Transitions 的浏览器里，小图和大图共用一个 transition name，
+  // 浏览器会把图片从正文里的位置补间到全屏（关闭时再补间回去），不用自己算 FLIP。
+  function zoom(from: HTMLElement, to: HTMLElement, change: () => void) {
+    const root = document.documentElement;
+    if (!document.startViewTransition || reduce) return change();
+    from.style.viewTransitionName = 'zoom';
+    root.classList.add('zoom-transition');
+    const t = document.startViewTransition(() => {
+      from.style.viewTransitionName = '';
+      change();
+      to.style.viewTransitionName = 'zoom';
+    });
+    t.finished.finally(() => {
+      to.style.viewTransitionName = '';
+      root.classList.remove('zoom-transition');
+    });
+  }
+
   function openLightbox(img: HTMLImageElement) {
     const box = document.createElement('dialog');
     box.className = 'lightbox';
@@ -185,13 +210,37 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     big.alt = img.alt;
     box.append(big);
     document.body.append(box);
-    document.documentElement.classList.add('lightbox-open');
-    box.addEventListener('click', () => box.close());
-    box.addEventListener('close', () => {
-      document.documentElement.classList.remove('lightbox-open');
-      box.remove();
+    let closing = false;
+    const shut = () => {
+      if (closing) return;
+      closing = true;
+      zoom(big, img, () => {
+        document.documentElement.classList.remove('lightbox-open');
+        box.remove();
+      });
+    };
+    box.addEventListener('click', shut);
+    // Esc：拦下默认的立即关闭，改成带动画的关闭
+    box.addEventListener('cancel', (e) => {
+      e.preventDefault();
+      shut();
     });
-    box.showModal();
+    zoom(img, big, () => {
+      document.documentElement.classList.add('lightbox-open');
+      box.showModal();
+    });
+  }
+
+  // ---------- 给打开 DevTools 的同行留句话 ----------
+  if (!(window as any).__greeted) {
+    (window as any).__greeted = true;
+    const mono = 'font-family: ui-monospace, Menlo, Consolas, monospace;';
+    console.log(
+      `%c   .-""""-.\n  /        \\\n |~~~~~~~~~~|\n |  ~~~~~~  |\n  \\        /\n   '-....-'\n%c你好，同行。%c\n这个站没有用 UI 框架和动画库，实现思路都写在 /colophon 里。\n按 \` 可以打开一个终端——里面藏了一个 flag。`,
+      `${mono} color: #62e0d1; line-height: 1.2;`,
+      'font-size: 15px; font-weight: 600; line-height: 2.2;',
+      `${mono} color: inherit;`,
+    );
   }
 
   // ---------- 代码复制 / 打码揭示 / 图片放大 ----------

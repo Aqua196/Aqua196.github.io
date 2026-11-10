@@ -1,4 +1,5 @@
 ---
+import Kinetic from '../components/Kinetic.astro';
 import '../styles/prose.css';
 import Base from './Base.astro';
 import Socials from '../components/Socials.astro';
@@ -17,7 +18,7 @@ const { frontmatter } = Astro.props;
           {frontmatter.avatar ? <img src={url(frontmatter.avatar)} alt="" /> : SITE.author.slice(0, 1).toUpperCase()}
         </div>
         <div>
-          <h1>{SITE.author}</h1>
+          <h1><Kinetic text={SITE.author} /></h1>
           <p>{frontmatter.bio ?? SITE.description}</p>
           <div class="links"><Socials socials={SOCIALS} inline /></div>
         </div>

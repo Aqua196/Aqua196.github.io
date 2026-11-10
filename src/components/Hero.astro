@@ -13,7 +13,7 @@ const pad = (n: number) => String(n).padStart(2, '0');
 const [, word = SITE.author, digits = ''] = /^(.*?)(\d+)$/.exec(SITE.author) ?? [];
 ---
 
-<section class="hero" id="hero">
+<section class="hero" id="hero" data-word={digits || SITE.author}>
   <div class="dots" aria-hidden="true"></div>
   <canvas id="stage" aria-hidden="true"></canvas>
   <div class="container inner">
@@ -154,19 +154,6 @@ const [, word = SITE.author, digits = ''] = /^(.*?)(\d+)$/.exec(SITE.author) ?? 
     letter-spacing: -0.02em;
     /* 斜体数字和前面的正体字母之间留一点呼吸 */
     margin-left: 0.05em;
-  }
-  /* 逐字入场：从模糊、下沉的状态一个个对上焦 */
-  .ch {
-    display: inline-block;
-    animation: focus-in 1.1s var(--ease) both;
-    animation-delay: calc(var(--i) * 0.06s + 0.05s);
-  }
-  @keyframes focus-in {
-    from {
-      opacity: 0;
-      filter: blur(16px);
-      transform: translateY(0.18em) scale(1.06);
-    }
   }
   .lead {
     width: fit-content;
@@ -349,20 +336,17 @@ const [, word = SITE.author, digits = ''] = /^(.*?)(\d+)$/.exec(SITE.author) ?? 
       flex-wrap: wrap;
     }
   }
-  @media (prefers-reduced-motion: reduce) {
-    .ch {
-      animation: none;
-    }
-  }
 </style>
 
 <script>
-  import { createSculpture, type Sculpture } from '../scripts/particles';
+  import { mountSculpture } from '../scripts/mount';
+  import type { Target } from '../scripts/particles';
   import { MODELS } from '../scripts/surfaces';
 
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   let timers: number[] = [];
   let cleanup: (() => void) | null = null;
+  let visit = 0; // 每次进入 / 离开首页加一：异步挂载完成时如果页面已经换走了，就立刻销毁
   const later = (fn: () => void, ms: number) => timers.push(window.setTimeout(fn, ms));
 
   function typewriter(el: HTMLElement, lines: string[]) {
@@ -404,70 +388,42 @@ const [, word = SITE.author, digits = ''] = /^(.*?)(\d+)$/.exec(SITE.author) ?? 
   async function sculpture() {
     const stage = document.getElementById('stage') as HTMLCanvasElement | null;
     const art = document.getElementById('art');
-    if (!stage || !art) return;
+    const hero = document.getElementById('hero');
+    if (!stage || !art || !hero) return;
     const $ = (id: string) => document.getElementById(id);
 
-    const onModel = (i: number) => {
-      const m = MODELS[i];
-      $('model-name')!.textContent = m.name;
-      $('model-note')!.textContent = m.note;
-      $('model-idx')!.textContent = String(i + 1);
-    };
-    const layout = () => {
-      const a = art.getBoundingClientRect();
-      const c = stage.getBoundingClientRect();
-      return { x: a.left + a.width / 2 - c.left, y: a.top + a.height / 2 - c.top, r: Math.min(a.width, a.height) * 0.56 };
-    };
-    // 小屏、低配设备少放一些粒子；引擎自己还会在掉帧时继续降
-    const weak = innerWidth < 720 || (navigator.hardwareConcurrency ?? 8) <= 4;
-    const fmt = new Intl.NumberFormat('en-US');
+    // 轮播的最后一站：粒子拼出 ID 里的数字（没有数字就拼整个名字）
+    const word = hero.dataset.word || '';
+    const figures: { name: string; note: string }[] = MODELS.map(({ name, note }) => ({ name, note }));
+    const targets: Target[] = MODELS.map((m, i) => ({ surface: i, tilt: m.tilt }));
+    if (word) {
+      targets.push({ text: word, italic: /^\d+$/.test(word), tilt: 0.06, flat: true });
+      figures.push({ name: `“${word}”`, note: word === '196' ? 'smallest Lychrel candidate' : 'hello, world' });
+    }
 
-    let ctrl: Pick<Sculpture, 'next' | 'refresh' | 'setScroll' | 'destroy'> | null = createSculpture(stage, {
-      count: weak ? 70_000 : 160_000,
-      // 调试用：网址带 ?hq 时不做自适应降画质
-      adaptive: !new URLSearchParams(location.search).has('hq'),
-      layout,
-      onModel,
+    const fmt = new Intl.NumberFormat('en-US');
+    const mine = ++visit;
+    const mounted = await mountSculpture({
+      stage,
+      art,
+      targets,
+      scatterOn: hero,
+      fallback: true,
+      onModel: (i) => {
+        $('model-name')!.textContent = figures[i].name;
+        $('model-note')!.textContent = figures[i].note;
+        $('model-idx')!.textContent = String(i + 1);
+      },
       onStats: ({ fps, count }) => {
         $('hud-count')!.textContent = fmt.format(count);
         $('hud-fps')!.textContent = fps ? String(fps) : '—';
       },
     });
-    if (ctrl) {
-      $('hud')!.hidden = false;
-    } else {
-      // 没有 WebGL2：换成画在占位格里的 CPU 点刻版本
-      stage.remove();
-      const canvas = document.createElement('canvas');
-      canvas.setAttribute('aria-hidden', 'true');
-      art.prepend(canvas);
-      const { createStipple } = await import('../scripts/stipple');
-      ctrl = createStipple(canvas, { onModel });
-    }
-    if (!ctrl) return;
-    const c = ctrl;
-
-    const nextBtn = $('model-next');
-    nextBtn?.addEventListener('click', c.next);
-    // 往下滚的时候把雕塑吹散
-    const hero = document.getElementById('hero')!;
-    const onScroll = () => c.setScroll((scrollY - hero.offsetHeight * 0.12) / (hero.offsetHeight * 0.75));
-    window.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
-    // 切换明暗主题、字体加载完导致布局变化后，重新取色和定位
-    const themeWatch = new MutationObserver(c.refresh);
-    themeWatch.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-    const sizeWatch = new ResizeObserver(c.refresh);
-    sizeWatch.observe(art);
-    document.addEventListener('sculpture:next', c.next);
-
-    cleanup = () => {
-      window.removeEventListener('scroll', onScroll);
-      document.removeEventListener('sculpture:next', c.next);
-      themeWatch.disconnect();
-      sizeWatch.disconnect();
-      c.destroy();
-    };
+    if (!mounted) return;
+    if (mine !== visit) return mounted.destroy();
+    if (mounted.webgl) $('hud')!.hidden = false;
+    $('model-next')?.addEventListener('click', mounted.next);
+    cleanup = mounted.destroy;
   }
 
   function init() {
@@ -482,6 +438,7 @@ const [, word = SITE.author, digits = ''] = /^(.*?)(\d+)$/.exec(SITE.author) ?? 
   document.addEventListener('astro:before-swap', () => {
     timers.forEach(clearTimeout);
     timers = [];
+    visit++;
     cleanup?.();
     cleanup = null;
   });

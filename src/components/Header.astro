@@ -25,6 +25,7 @@ const isActive = (href: string) => {
           NAV.map((item) => (
             <li>
               <a href={url(item.href)} class:list={{ active: isActive(item.href) }} aria-current={isActive(item.href) ? 'page' : undefined}>
+                {isActive(item.href) && <i class="pill" aria-hidden="true" />}
                 {item.label}
               </a>
             </li>
@@ -59,6 +60,11 @@ const isActive = (href: string) => {
     -webkit-backdrop-filter: saturate(1.4) blur(14px);
     backdrop-filter: saturate(1.4) blur(14px);
     border-bottom: 1px solid var(--line);
+    transition: transform 0.4s var(--ease);
+  }
+  /* 往下读的时候收起来，往回滚一点就出现 */
+  .site-header:global(.tucked) {
+    transform: translateY(-101%);
   }
   .bar {
     display: flex;
@@ -109,6 +115,7 @@ const isActive = (href: string) => {
   }
   .links a {
     position: relative;
+    isolation: isolate;
     display: block;
     padding: 0.35rem 0.8rem;
     font-size: 0.9rem;
@@ -121,7 +128,16 @@ const isActive = (href: string) => {
   }
   .links a.active {
     color: var(--fg);
+  }
+  /* 当前页的底色是一个单独的元素，带着自己的 view-transition-name：
+     切页时浏览器会把它从旧位置补间到新位置，胶囊就“滑”过去了，不需要任何 JS */
+  .pill {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
     background: var(--bg-3);
+    view-transition-name: nav-pill;
   }
   .actions {
     display: flex;
@@ -240,8 +256,10 @@ const isActive = (href: string) => {
       border-radius: 0;
     }
     .links a.active {
-      background: none;
       color: var(--accent);
+    }
+    .pill {
+      display: none;
     }
     .actions {
       margin-left: auto;
@@ -279,13 +297,26 @@ const isActive = (href: string) => {
       const t = e.target as Node;
       if (links?.classList.contains('open') && !links.contains(t) && !menuBtn?.contains(t)) setOpen(false);
     };
+    // 往下滚收起页头，往上滚或回到顶部时放出来；菜单开着、焦点在页头里的时候不收
+    const header = document.getElementById('site-header');
+    let lastY = scrollY;
+    const onScroll = () => {
+      const y = scrollY;
+      const busy = links?.classList.contains('open') || header?.contains(document.activeElement);
+      if (y < 320 || y < lastY - 6 || busy) header?.classList.remove('tucked');
+      else if (y > lastY + 6) header?.classList.add('tucked');
+      lastY = y;
+    };
     document.addEventListener('keydown', onKey);
     document.addEventListener('click', onClick);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    header?.addEventListener('focusin', () => header.classList.remove('tucked'));
     document.addEventListener(
       'astro:before-swap',
       () => {
         document.removeEventListener('keydown', onKey);
         document.removeEventListener('click', onClick);
+        window.removeEventListener('scroll', onScroll);
       },
       { once: true },
     );

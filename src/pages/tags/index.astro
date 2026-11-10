@@ -1,4 +1,5 @@
 ---
+import Kinetic from '../../components/Kinetic.astro';
 import Base from '../../layouts/Base.astro';
 import Empty from '../../components/Empty.astro';
 import { getPosts, tagGroups } from '../../utils/posts';
@@ -16,7 +17,7 @@ const size = (n: number) => (0.9 + ((n - min) / (max - min || 1)) * 1.1).toFixed
   <div class="container">
     <header class="page-head">
       <div class="eyebrow" data-reveal>sort tags | uniq -c</div>
-      <h1 data-reveal style="--delay:.05s">Tags</h1>
+      <h1><Kinetic text="Tags" /></h1>
       <p data-reveal style="--delay:.1s">{tags.length} 个标签，字越大用得越多。</p>
     </header>
 

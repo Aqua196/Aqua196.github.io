@@ -4,38 +4,74 @@ import { url } from '../utils/url';
 ---
 
 <Base title="404" noindex>
-  <div class="container wrap">
-    <p class="label">Error · Not Found</p>
-    <h1>4<em>0</em>4</h1>
-    <pre class="term mono"><span class="ps">$</span> curl <span id="missing-path">this-page</span>
+  <section class="nf" id="nf">
+    <canvas id="nf-stage" aria-hidden="true"></canvas>
+    <div class="container wrap">
+      <p class="label">Error · Not Found</p>
+      <!-- 有 WebGL2 时这行大字由粒子拼出来（h1 还在，只是看不见）；没有的话就直接显示它 -->
+      <div class="art" id="nf-art">
+        <h1>4<em>0</em>4</h1>
+      </div>
+      <pre class="term mono"><span class="ps">$</span> curl <span id="missing-path">this-page</span>
 <span class="err">Segmentation fault (core dumped)</span>
 
 页面不存在，或者已经被 free 掉了。</pre>
-    <div class="cta">
-      <a class="btn btn-primary" href={url('/')}>回到首页 <span class="arr" aria-hidden="true">→</span></a>
-      <button class="btn" type="button" data-open-search>搜索文章</button>
+      <div class="cta">
+        <a class="btn btn-primary" href={url('/')} data-magnetic>回到首页 <span class="arr" aria-hidden="true">→</span></a>
+        <button class="btn" type="button" data-open-search data-magnetic>搜索文章</button>
+      </div>
     </div>
-  </div>
+  </section>
 </Base>
 
 <style>
+  .nf {
+    position: relative;
+    isolation: isolate;
+  }
+  #nf-stage {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+    touch-action: pan-y;
+  }
   .wrap {
-    padding-top: 10vh;
+    padding-top: 8vh;
+    padding-bottom: 2rem;
+    pointer-events: none;
+  }
+  .wrap > :not(.art) {
+    pointer-events: auto;
+    width: fit-content;
+  }
+  .art {
+    display: flex;
+    align-items: center;
+    width: min(100%, 44rem);
+    aspect-ratio: 1.7;
+    margin: 1rem 0 0.5rem;
   }
   h1 {
-    margin: 1rem 0 0;
+    margin: 0;
     font-family: var(--font-display);
     font-size: clamp(8rem, 30vw, 17rem);
     font-weight: 400;
     line-height: 0.85;
     letter-spacing: -0.03em;
+    transition: opacity 0.4s;
   }
   h1 em {
     color: var(--accent);
   }
+  .nf:global(.gl) h1 {
+    opacity: 0;
+  }
   .term {
     max-width: 34rem;
-    margin: 2.5rem 0 2rem;
+    margin: 1.5rem 0 2rem;
     padding: 1.1rem 1.3rem;
     font-size: 0.85rem;
     color: var(--fg-2);
@@ -59,9 +95,36 @@ import { url } from '../utils/url';
 </style>
 
 <script>
-  // 404 页是同一个静态文件，访问的真实路径只能在浏览器里拿到
-  document.addEventListener('astro:page-load', () => {
+  import { mountSculpture } from '../scripts/mount';
+
+  let cleanup: (() => void) | null = null;
+  let visit = 0;
+
+  document.addEventListener('astro:page-load', async () => {
+    // 404 页是同一个静态文件，访问的真实路径只能在浏览器里拿到
     const el = document.getElementById('missing-path');
     if (el) el.textContent = decodeURI(location.pathname);
+
+    const stage = document.getElementById('nf-stage') as HTMLCanvasElement | null;
+    const art = document.getElementById('nf-art');
+    const section = document.getElementById('nf');
+    if (!stage || !art || !section) return;
+    const mine = ++visit;
+    const mounted = await mountSculpture({
+      stage,
+      art,
+      targets: [{ text: '404', tilt: 0.05, flat: true }],
+      // “404” 的宽高比约 1.56，比占位格（1.7 : 1）略窄：按高度留一点边
+      radius: 0.76,
+    });
+    if (!mounted) return;
+    if (mine !== visit) return mounted.destroy();
+    section.classList.add('gl');
+    cleanup = mounted.destroy;
+  });
+  document.addEventListener('astro:before-swap', () => {
+    visit++;
+    cleanup?.();
+    cleanup = null;
   });
 </script>

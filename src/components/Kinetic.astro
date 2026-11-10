@@ -1,0 +1,12 @@
+---
+// 大标题的逐字入场：每个字符一个 span，按顺序错开动画（样式在 global.css 的 .ch）。
+// 读屏读到的是完整的词，拆开的字符对它隐藏。
+interface Props {
+  text: string;
+  /** 从第几个字符开始算延迟（一个标题拆成几段时用） */
+  offset?: number;
+}
+const { text, offset = 0 } = Astro.props;
+---
+
+<span class="sr-only">{text}</span><span aria-hidden="true">{[...text].map((ch, i) => <span class="ch" style={`--i:${offset + i}`}>{ch === ' ' ? '\u00a0' : ch}</span>)}</span>

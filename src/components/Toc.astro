@@ -10,6 +10,7 @@ const { headings } = Astro.props;
 <aside class="toc" aria-label="目录">
   <div class="label">On this page</div>
   <ol id="toc-list">
+    <li class="marker" id="toc-marker" role="presentation" aria-hidden="true"></li>
     {
       headings.map((h) => (
         <li class={`d${h.depth}`}>
@@ -34,10 +35,23 @@ const { headings } = Astro.props;
     margin-bottom: 0.9rem;
   }
   ol {
+    position: relative;
     list-style: none;
     margin: 0;
     padding: 0;
     border-left: 1px solid var(--line);
+  }
+  /* 当前章节的指示条：一根会滑动的短线，位置和高度由脚本按当前条目设置 */
+  .marker {
+    position: absolute;
+    top: 0;
+    left: -1px;
+    width: 2px;
+    height: var(--mh, 0);
+    border-radius: 2px;
+    background: var(--accent);
+    transform: translateY(var(--my, 0));
+    transition: transform 0.35s var(--ease), height 0.35s var(--ease);
   }
   li a {
     display: block;
@@ -58,7 +72,6 @@ const { headings } = Astro.props;
   }
   li a.active {
     color: var(--accent);
-    border-left-color: var(--accent);
   }
   @media (max-width: 1100px) {
     .toc {
@@ -71,6 +84,7 @@ const { headings } = Astro.props;
   function initToc() {
     const links = [...document.querySelectorAll<HTMLAnchorElement>('#toc-list a')];
     if (!links.length) return;
+    const marker = document.getElementById('toc-marker');
     const heads = links
       .map((a) => document.getElementById(a.dataset.slug!))
       .filter((el): el is HTMLElement => !!el);
@@ -81,7 +95,14 @@ const { headings } = Astro.props;
         if (h.getBoundingClientRect().top - 140 <= 0) current = h;
         else break;
       }
-      links.forEach((a) => a.classList.toggle('active', a.dataset.slug === current?.id));
+      links.forEach((a) => {
+        const on = a.dataset.slug === current?.id;
+        a.classList.toggle('active', on);
+        if (on && marker) {
+          marker.style.setProperty('--my', `${a.offsetTop}px`);
+          marker.style.setProperty('--mh', `${a.offsetHeight}px`);
+        }
+      });
     };
     update();
     const onScroll = () => requestAnimationFrame(update);

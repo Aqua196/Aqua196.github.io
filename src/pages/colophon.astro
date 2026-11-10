@@ -1,4 +1,5 @@
 ---
+import Kinetic from '../components/Kinetic.astro';
 import Base from '../layouts/Base.astro';
 import { SITE, SOCIALS } from '../config';
 
@@ -9,8 +10,15 @@ const items = [
     title: 'GPU 粒子雕塑',
     file: 'src/scripts/particles.ts',
     tags: ['WebGL2', 'Transform Feedback', 'GLSL'],
-    body: '首页那团粒子没有用 three.js，是手写的 WebGL2。每个粒子的位置和速度都存在显存里，每帧用 transform feedback 做一步积分：弹簧把它拉向曲面上的目标点，一个无散的流场让它微微浮动，鼠标射线把它推开并卷成涡旋。曲面本身（三叶结、莫比乌斯带、克莱因瓶、博罗梅安环）是在顶点着色器里按参数方程算出来的，同样用 transform feedback 烘焙一次后复用。',
+    body: '首页那团粒子没有用 three.js，是手写的 WebGL2。每个粒子的位置和速度都存在显存里，每帧用 transform feedback 做一步积分：弹簧把它拉向曲面上的目标点，一个无散的流场让它微微浮动，鼠标射线把它推开并卷成涡旋。曲面本身（三叶结、莫比乌斯带、克莱因瓶、博罗梅安环）是在顶点着色器里按参数方程算出来的，同样用 transform feedback 烘焙一次后复用。跑得快的粒子会变亮，所以被搅动的地方看得出来；点击会从落点炸开一圈冲击波。',
     try: '在首页拖动、快速划过、点击它，或者往下滚',
+  },
+  {
+    title: '粒子拼字',
+    file: 'src/scripts/particles.ts',
+    tags: ['Canvas 2D 采样', '零每帧开销'],
+    body: '轮播的最后一站，粒子会拼出一行字；404 页的大字也是同一个引擎。做法是把字画在离屏 canvas 上，从有墨的像素里按黄金分割步进均匀抽样，当作又一份“目标位置”交给同一套物理。再用模糊过的副本求梯度当法线，笔画边缘向外倒，打上光就有浮雕感。这些只在准备阶段跑一次，每帧的开销和显示曲面时完全一样。',
+    try: '在首页连点几次 next，或者访问一个不存在的地址',
   },
   {
     title: '点云的遮挡',
@@ -22,7 +30,7 @@ const items = [
     title: '渐进增强与自适应画质',
     file: 'src/components/Hero.astro',
     tags: ['Progressive enhancement', 'prefers-reduced-motion'],
-    body: '粒子的采样用 R2 低差异序列，任意前缀都是均匀的，所以掉帧时只要少画一些就能降画质，不用重新生成。引擎会先降像素比、再减粒子数。浏览器不支持 WebGL2 时动态加载一个 Canvas 2D 的 CPU 点刻版本；系统开了“减弱动态效果”就不跑物理，只画静止的一帧。离开视口或切到后台时循环会停。',
+    body: '粒子的采样用 R2 低差异序列，任意前缀都是均匀的，所以掉帧时只要少画一些就能降画质，不用重新生成。引擎会先降像素比、再减粒子数，被砍掉的粒子连物理也不再算。浏览器不支持 WebGL2 时动态加载一个 Canvas 2D 的 CPU 点刻版本；系统开了“减弱动态效果”就不跑物理，只画静止的一帧。离开视口或切到后台时循环会停。',
   },
   {
     title: '命令面板',
@@ -44,8 +52,8 @@ const items = [
     title: '页面切换',
     file: 'src/styles/global.css',
     tags: ['View Transitions API'],
-    body: '站内跳转不整页刷新。页头单独成组，切页时原地不动；文章标题有自己的 transition name，会从列表里“飞”到文章页头。明暗主题切换是从按钮位置扩散开的一个圆，用 clip-path 驱动 view transition 的新快照。',
-    try: '从首页点进任意一篇文章，再切一下主题',
+    body: '站内跳转不整页刷新。页头单独成组，切页时原地不动；文章标题有自己的 transition name，会从列表里“飞”到文章页头。导航里标记当前页的胶囊也是一个带名字的元素，切页时由浏览器把它从旧位置补间到新位置，没有写 JS。文章里的图片点开放大用的是同一招：小图和大图共用一个名字。明暗主题切换是从按钮位置扩散开的一个圆，用 clip-path 驱动 view transition 的新快照。',
+    try: '在导航里换几个页面看那个胶囊，再切一下主题',
   },
   {
     title: '指针效果',
@@ -79,7 +87,7 @@ const items = [
   <div class="container">
     <header class="page-head">
       <div class="eyebrow" data-reveal>cat ./COLOPHON.md</div>
-      <h1 data-reveal style="--delay:.05s">Colophon</h1>
+      <h1><Kinetic text="Colophon" /></h1>
       <p data-reveal style="--delay:.1s">
         这个站是 {SITE.author} 自己设计和实现的：Astro 生成静态页面，交互部分全部手写，没有引入 UI 框架和动画库。下面是做的时候比较有意思的几件事。{
           SOCIALS.github && (

@@ -439,5 +439,24 @@ const hasChal = d.event || d.difficulty || d.points != null || d.solves != null 
       once: true,
     });
   }
+  // 给每个二、三级标题加一个锚点：悬停出现，点击复制这一节的链接
+  function initAnchors() {
+    document.querySelectorAll<HTMLElement>('#prose :is(h2, h3)[id]').forEach((h) => {
+      if (h.querySelector('.anchor') || h.closest('.footnotes')) return;
+      const a = document.createElement('a');
+      a.className = 'anchor';
+      a.href = `#${h.id}`;
+      a.textContent = '#';
+      a.setAttribute('aria-label', `复制“${h.textContent}”这一节的链接`);
+      a.addEventListener('click', () => {
+        navigator.clipboard?.writeText(new URL(`#${h.id}`, location.href).href).then(() => {
+          a.classList.add('copied');
+          setTimeout(() => a.classList.remove('copied'), 1400);
+        });
+      });
+      h.append(a);
+    });
+  }
   document.addEventListener('astro:page-load', initProgress);
+  document.addEventListener('astro:page-load', initAnchors);
 </script>

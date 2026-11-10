@@ -1,4 +1,5 @@
 ---
+import Kinetic from '../../components/Kinetic.astro';
 import Base from '../../layouts/Base.astro';
 import PostRow from '../../components/PostRow.astro';
 import { getPosts, categoryMeta, type Post } from '../../utils/posts';
@@ -25,7 +26,7 @@ const { label, hue } = categoryMeta(category);
   <div class="container" data-tone style={`--h:${hue}`}>
     <header class="page-head">
       <div class="eyebrow" data-reveal>cd ./categories/{category}</div>
-      <h1 data-reveal style="--delay:.05s">{label}<i aria-hidden="true">.</i></h1>
+      <h1><Kinetic text={label} /><i class="ch" aria-hidden="true" style={`--i:${label.length}`}>.</i></h1>
       <p data-reveal style="--delay:.1s">
         共 {posts.length} 篇 · <a href={url('/categories')}>全部分类</a>
       </p>

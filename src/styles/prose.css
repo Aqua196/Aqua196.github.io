@@ -41,6 +41,30 @@
   letter-spacing: 0.12em;
   color: var(--cat, var(--accent));
 }
+/* 标题锚点：悬停时出现的 #，点一下复制这一节的链接（由文章页脚本插入） */
+.prose .anchor {
+  margin-left: 0.4em;
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  font-weight: 400;
+  color: var(--muted);
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity 0.2s, color 0.2s;
+}
+.prose :is(h2, h3):hover .anchor,
+.prose .anchor:focus-visible {
+  opacity: 1;
+}
+.prose .anchor:hover,
+.prose .anchor.copied {
+  color: var(--accent);
+}
+.prose .anchor.copied::after {
+  content: ' 已复制';
+  font-family: var(--font-body);
+  font-size: 0.85em;
+}
 .prose h3 {
   margin: 2.4em 0 0.7em;
   font-size: 1.22rem;
@@ -214,7 +238,6 @@ html.lightbox-open {
 .lightbox[open] {
   display: grid;
   place-items: center;
-  animation: lightbox-in 0.25s var(--ease);
 }
 .lightbox::backdrop {
   background: color-mix(in srgb, var(--bg) 88%, transparent);
@@ -226,12 +249,6 @@ html.lightbox-open {
   max-height: calc(100vh - 48px);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-}
-@keyframes lightbox-in {
-  from {
-    opacity: 0;
-    transform: scale(0.97);
-  }
 }
 
 /* 折叠 */

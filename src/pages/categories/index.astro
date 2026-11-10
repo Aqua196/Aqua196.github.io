@@ -1,4 +1,5 @@
 ---
+import Kinetic from '../../components/Kinetic.astro';
 import Base from '../../layouts/Base.astro';
 import Empty from '../../components/Empty.astro';
 import { getPosts, countBy, categoryMeta } from '../../utils/posts';
@@ -12,7 +13,7 @@ const cats = countBy(posts, (p) => p.data.category);
   <div class="container">
     <header class="page-head">
       <div class="eyebrow" data-reveal>ls ./categories</div>
-      <h1 data-reveal style="--delay:.05s">Categories</h1>
+      <h1><Kinetic text="Categories" /></h1>
       <p data-reveal style="--delay:.1s">{cats.length} 个方向。</p>
     </header>
 
