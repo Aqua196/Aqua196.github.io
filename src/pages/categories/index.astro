@@ -23,7 +23,7 @@ const cats = countBy(posts, (p) => p.data.category);
           const recent = posts.filter((p) => p.data.category === key).slice(0, 3);
           const cat = categoryMeta(key);
           return (
-            <section class="cat" data-tone style={`--h:${cat.hue}`}>
+            <section class="cat" data-tone data-spot style={`--h:${cat.hue}`}>
               <a class="head" href={categoryUrl(key)}>
                 <span class="chip">{String(n).padStart(2, '0')} posts</span>
                 <h2>{cat.label}</h2>
@@ -63,25 +63,18 @@ const cats = countBy(posts, (p) => p.data.category);
     display: flex;
     flex-direction: column;
     padding: 1.5rem 1.5rem 1.3rem;
-    background: var(--bg-2);
+    /* 右上角一抹分类色 */
+    background:
+      radial-gradient(70% 60% at 100% 0%, color-mix(in oklch, var(--cat) 12%, transparent), transparent 70%),
+      var(--bg-2);
     border: 1px solid var(--line);
     border-radius: var(--radius);
-    overflow: hidden;
     transition: border-color 0.25s;
-  }
-  /* 右上角一抹分类色 */
-  .cat::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(70% 60% at 100% 0%, color-mix(in oklch, var(--cat) 12%, transparent), transparent 70%);
-    pointer-events: none;
   }
   .cat:hover {
     border-color: var(--cat-line);
   }
   .head {
-    position: relative;
     display: grid;
     grid-template-columns: 1fr auto;
     align-items: end;
@@ -114,7 +107,6 @@ const cats = countBy(posts, (p) => p.data.category);
     transform: none;
   }
   ul {
-    position: relative;
     flex: 1;
     list-style: none;
     margin: 0;
@@ -136,7 +128,6 @@ const cats = countBy(posts, (p) => p.data.category);
     color: var(--fg);
   }
   .more-link {
-    position: relative;
     margin-top: 0.8rem;
   }
 </style>

@@ -15,27 +15,39 @@ const [, word = SITE.author, digits = ''] = /^(.*?)(\d+)$/.exec(SITE.author) ?? 
 
 <section class="hero" id="hero">
   <div class="dots" aria-hidden="true"></div>
-  <div class="container">
+  <canvas id="stage" aria-hidden="true"></canvas>
+  <div class="container inner">
     <div class="grid">
       <div class="text">
         <p class="eyebrow label" data-reveal><i aria-hidden="true"></i>{SITE.subtitle}</p>
-        <h1 class="name" data-reveal style="--delay:.05s">{word}{digits && <em>{digits}</em>}</h1>
-        <p class="lead" data-reveal style="--delay:.1s">{SITE.description}</p>
-        <p class="typer mono" data-reveal style="--delay:.15s">
+        <h1 class="name" aria-label={SITE.author}>
+          {[...word].map((ch, i) => <span class="ch" aria-hidden="true" style={`--i:${i}`}>{ch}</span>)}
+          {
+            digits && (
+              <em>
+                {[...digits].map((ch, i) => (
+                  <span class="ch" aria-hidden="true" style={`--i:${word.length + i}`}>{ch}</span>
+                ))}
+              </em>
+            )
+          }
+        </h1>
+        <p class="lead" data-reveal style="--delay:.35s">{SITE.description}</p>
+        <p class="typer mono" data-reveal style="--delay:.42s">
           <span class="prompt" aria-hidden="true">$</span>
           <span class="typed" id="typed" data-lines={JSON.stringify(SITE.taglines)}>{SITE.taglines[0]}</span><span
             class="caret"
             aria-hidden="true"></span>
         </p>
-        <div class="cta" data-reveal style="--delay:.2s">
-          <a class="btn btn-primary" href="#latest">开始阅读 <span class="arr down" aria-hidden="true">↓</span></a>
-          <a class="btn" href={url('/archive')}>全部归档 <span class="arr" aria-hidden="true">→</span></a>
+        <div class="cta" data-reveal style="--delay:.5s">
+          <a class="btn btn-primary" href="#latest" data-magnetic>开始阅读 <span class="arr down" aria-hidden="true">↓</span></a>
+          <a class="btn" href={url('/archive')} data-magnetic>全部归档 <span class="arr" aria-hidden="true">→</span></a>
         </div>
       </div>
 
-      <figure class="art" data-reveal style="--delay:.15s">
-        <canvas id="model" role="img" aria-label="可以拖动旋转的三维曲面"></canvas>
-        <figcaption class="mono">
+      <!-- 占位：雕塑画在整屏的 canvas 上，这个格子只用来告诉它“中心在哪、能画多大” -->
+      <figure class="art" id="art">
+        <figcaption class="mono" data-reveal style="--delay:.6s">
           <span class="cap-name">fig. <span id="model-idx">1</span> — <span id="model-name" aria-live="polite">trefoil knot</span></span>
           <span class="cap-note" id="model-note">crossing number = 3</span>
           <button type="button" class="cap-next" id="model-next" aria-label="切换到下一个模型">next <span aria-hidden="true">→</span></button>
@@ -43,11 +55,18 @@ const [, word = SITE.author, digits = ''] = /^(.*?)(\d+)$/.exec(SITE.author) ?? 
       </figure>
     </div>
 
-    <div class="stats" data-reveal style="--delay:.25s">
-      <a href={url('/archive')}><span class="v" data-count={postCount}>{pad(postCount)}</span><span class="k">Writeups</span></a>
-      <a href={url('/categories')}><span class="v" data-count={categoryCount}>{pad(categoryCount)}</span><span class="k">Categories</span></a>
-      <a href={url('/tags')}><span class="v" data-count={tagCount}>{pad(tagCount)}</span><span class="k">Tags</span></a>
-      <div><span class="v">{SITE.since.slice(0, 4)}</span><span class="k">Since</span></div>
+    <div class="foot">
+      <div class="stats">
+        <a href={url('/archive')}><span class="v" data-count={postCount}>{pad(postCount)}</span><span class="k">Writeups</span></a>
+        <a href={url('/categories')}><span class="v" data-count={categoryCount}>{pad(categoryCount)}</span><span class="k">Categories</span></a>
+        <a href={url('/tags')}><span class="v" data-count={tagCount}>{pad(tagCount)}</span><span class="k">Tags</span></a>
+        <div><span class="v">{SITE.since.slice(0, 4)}</span><span class="k">Since</span></div>
+      </div>
+      <p class="hud mono" id="hud" hidden>
+        <span><b id="hud-count">0</b> particles</span>
+        <span>GPU physics</span>
+        <span><b id="hud-fps">60</b> fps</span>
+      </p>
     </div>
   </div>
 </section>
@@ -55,29 +74,63 @@ const [, word = SITE.author, digits = ''] = /^(.*?)(\d+)$/.exec(SITE.author) ?? 
 <style>
   .hero {
     position: relative;
-    padding: 4.5rem 0 0;
+    display: flex;
+    min-height: calc(100svh - var(--header-h));
+    isolation: isolate;
   }
-  /* 背景点阵：只在插图那一侧淡淡地露出来 */
+  /* 背景点阵：只在雕塑那一侧淡淡地露出来 */
   .dots {
     position: absolute;
-    inset: 0 0 6rem;
-    z-index: -1;
+    inset: 0;
+    z-index: -2;
     background-image: radial-gradient(circle, var(--line-2) 1px, transparent 1.4px);
     background-size: 26px 26px;
-    mask-image: radial-gradient(ellipse 52% 62% at 74% 42%, #000 0%, transparent 100%);
-    -webkit-mask-image: radial-gradient(ellipse 52% 62% at 74% 42%, #000 0%, transparent 100%);
+    mask-image: radial-gradient(ellipse 50% 60% at 74% 44%, #000 0%, transparent 100%);
+    -webkit-mask-image: radial-gradient(ellipse 50% 60% at 74% 44%, #000 0%, transparent 100%);
+  }
+  /* 整屏画布：粒子可以飞出雕塑本身的范围，底部渐隐，不会在边界上被一刀切断 */
+  #stage {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+    /* 竖直方向留给页面滚动，水平拖动才交给旋转 */
+    touch-action: pan-y;
+    user-select: none;
+    -webkit-user-select: none;
+    mask-image: linear-gradient(#000 82%, transparent);
+    -webkit-mask-image: linear-gradient(#000 82%, transparent);
+  }
+  #stage:global(.dragging) {
+    cursor: grabbing;
+  }
+  /* 文字浮在画布上面：空白处的指针事件要漏下去给画布，文字和按钮自己接 */
+  .inner {
+    display: flex;
+    flex-direction: column;
+    pointer-events: none;
+  }
+  .text > *,
+  .foot > *,
+  figcaption {
+    pointer-events: auto;
   }
   .grid {
+    flex: 1;
     display: grid;
     grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
     gap: 3rem;
     align-items: center;
+    padding: 3.5rem 0 2.5rem;
   }
   .eyebrow {
     display: flex;
     align-items: center;
     gap: 0.7rem;
     margin: 0;
+    width: fit-content;
   }
   .eyebrow i {
     width: 7px;
@@ -87,6 +140,7 @@ const [, word = SITE.author, digits = ''] = /^(.*?)(\d+)$/.exec(SITE.author) ?? 
     box-shadow: 0 0 0 4px var(--accent-soft);
   }
   .name {
+    width: fit-content;
     margin: 1.4rem 0 1.6rem;
     font-family: var(--font-display);
     font-size: clamp(4.4rem, 15.5vw, 10.5rem);
@@ -101,7 +155,21 @@ const [, word = SITE.author, digits = ''] = /^(.*?)(\d+)$/.exec(SITE.author) ?? 
     /* 斜体数字和前面的正体字母之间留一点呼吸 */
     margin-left: 0.05em;
   }
+  /* 逐字入场：从模糊、下沉的状态一个个对上焦 */
+  .ch {
+    display: inline-block;
+    animation: focus-in 1.1s var(--ease) both;
+    animation-delay: calc(var(--i) * 0.06s + 0.05s);
+  }
+  @keyframes focus-in {
+    from {
+      opacity: 0;
+      filter: blur(16px);
+      transform: translateY(0.18em) scale(1.06);
+    }
+  }
   .lead {
+    width: fit-content;
     max-width: 30rem;
     margin: 0;
     font-size: clamp(1.05rem, 1.6vw, 1.2rem);
@@ -112,6 +180,8 @@ const [, word = SITE.author, digits = ''] = /^(.*?)(\d+)$/.exec(SITE.author) ?? 
   .typer {
     display: flex;
     align-items: center;
+    width: fit-content;
+    max-width: 100%;
     margin: 1.1rem 0 0;
     height: 1.8em;
     font-size: 0.88rem;
@@ -135,36 +205,34 @@ const [, word = SITE.author, digits = ''] = /^(.*?)(\d+)$/.exec(SITE.author) ?? 
     display: flex;
     flex-wrap: wrap;
     gap: 0.75rem;
+    width: fit-content;
     margin-top: 2.4rem;
   }
 
-  /* ---------- 插图 ---------- */
+  /* ---------- 雕塑的占位格 ---------- */
   .art {
-    margin: 0;
-    min-width: 0;
-  }
-  canvas {
-    display: block;
+    position: relative;
     width: 100%;
-    max-width: 540px;
+    max-width: 560px;
     aspect-ratio: 1;
     margin: 0 auto;
-    cursor: grab;
-    /* 竖直方向留给页面滚动，水平拖动才交给旋转 */
-    touch-action: pan-y;
-    user-select: none;
-    -webkit-user-select: none;
+    min-width: 0;
   }
-  canvas.dragging {
-    cursor: grabbing;
+  .art :global(canvas) {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+    touch-action: pan-y;
+    pointer-events: auto;
   }
   figcaption {
+    position: absolute;
+    inset: auto 0 -0.5rem;
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
     gap: 0.3rem 1.1rem;
-    max-width: 540px;
-    margin: -0.6rem auto 0;
     font-size: 0.72rem;
     color: var(--muted);
   }
@@ -192,22 +260,27 @@ const [, word = SITE.author, digits = ''] = /^(.*?)(\d+)$/.exec(SITE.author) ?? 
     transform: translateX(3px);
   }
 
-  /* ---------- 数字 ---------- */
-  .stats {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    margin: 4.5rem 0 0;
+  /* ---------- 数字 + 实时读数 ---------- */
+  .foot {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 2rem;
+    padding: 1.4rem 0 2rem;
     border-top: 1px solid var(--line);
+  }
+  .stats {
+    display: flex;
+    gap: clamp(1.5rem, 5vw, 4.5rem);
   }
   .stats > * {
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
-    padding: 1.4rem 0 0;
   }
   .v {
     font-family: var(--font-display);
-    font-size: clamp(2.4rem, 5vw, 3.4rem);
+    font-size: clamp(2.2rem, 4.4vw, 3.2rem);
     line-height: 1;
     font-variant-numeric: tabular-nums;
     transition: color 0.2s;
@@ -222,25 +295,45 @@ const [, word = SITE.author, digits = ''] = /^(.*?)(\d+)$/.exec(SITE.author) ?? 
   .stats a:hover .v {
     color: var(--accent);
   }
+  .hud {
+    display: flex;
+    gap: 0.4rem 1.2rem;
+    margin: 0;
+    font-size: 0.7rem;
+    color: var(--muted);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .hud[hidden] {
+    display: none;
+  }
+  .hud span + span::before {
+    content: '/';
+    margin-right: 1.2rem;
+    color: var(--line-2);
+  }
+  .hud b {
+    font-weight: 500;
+    color: var(--fg-2);
+  }
 
   @media (max-width: 900px) {
-    .hero {
-      padding-top: 3rem;
-    }
     .dots {
-      mask-image: radial-gradient(ellipse 80% 40% at 50% 68%, #000 0%, transparent 100%);
-      -webkit-mask-image: radial-gradient(ellipse 80% 40% at 50% 68%, #000 0%, transparent 100%);
+      mask-image: radial-gradient(ellipse 80% 36% at 50% 62%, #000 0%, transparent 100%);
+      -webkit-mask-image: radial-gradient(ellipse 80% 36% at 50% 62%, #000 0%, transparent 100%);
     }
     .grid {
       grid-template-columns: minmax(0, 1fr);
-      gap: 2.5rem;
+      gap: 1.5rem;
+      padding-top: 3rem;
     }
-    canvas,
-    figcaption {
+    .art {
       max-width: 420px;
     }
-    .stats {
-      margin-top: 3.5rem;
+    .foot {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1.4rem;
     }
   }
   @media (max-width: 520px) {
@@ -248,16 +341,28 @@ const [, word = SITE.author, digits = ''] = /^(.*?)(\d+)$/.exec(SITE.author) ?? 
       display: none;
     }
     .stats {
-      grid-template-columns: repeat(2, 1fr);
-      row-gap: 0.4rem;
+      width: 100%;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .hud {
+      flex-wrap: wrap;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ch {
+      animation: none;
     }
   }
 </style>
 
 <script>
+  import { createSculpture, type Sculpture } from '../scripts/particles';
+  import { MODELS } from '../scripts/surfaces';
+
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   let timers: number[] = [];
-  let stopFigure: (() => void) | null = null;
+  let cleanup: (() => void) | null = null;
   const later = (fn: () => void, ms: number) => timers.push(window.setTimeout(fn, ms));
 
   function typewriter(el: HTMLElement, lines: string[]) {
@@ -295,427 +400,78 @@ const [, word = SITE.author, digits = ''] = /^(.*?)(\d+)$/.exec(SITE.author) ?? 
     requestAnimationFrame(tick);
   }
 
-  // ---------- 点刻曲面渲染 ----------
-  // 每个模型是一个参数曲面 f(u, v)，u、v ∈ [0, 1]。预先在 U×V 网格上（带一点随机抖动）采样出点和法线，
-  // 每帧旋转 → 透视投影 → 用一张粗网格的深度图挡掉背面的点 → 按光照决定每个点的浓淡，直接写进像素。
-  // 所有模型共用同一套采样点，所以切换时可以逐点插值，形状会“变形”过去。
-  type Vec = [number, number, number];
-  // 约定：模型的对称轴是 y 轴，展示时绕它转（转台），tilt 是默认的俯视角
-  type Model = { name: string; note: string; tilt: number; f: (u: number, v: number) => Vec };
+  // ---------- 粒子雕塑 ----------
+  async function sculpture() {
+    const stage = document.getElementById('stage') as HTMLCanvasElement | null;
+    const art = document.getElementById('art');
+    if (!stage || !art) return;
+    const $ = (id: string) => document.getElementById(id);
 
-  const TAU = Math.PI * 2;
-  const U = 720;
-  const V = 72;
-  const N = U * V;
+    const onModel = (i: number) => {
+      const m = MODELS[i];
+      $('model-name')!.textContent = m.name;
+      $('model-note')!.textContent = m.note;
+      $('model-idx')!.textContent = String(i + 1);
+    };
+    const layout = () => {
+      const a = art.getBoundingClientRect();
+      const c = stage.getBoundingClientRect();
+      return { x: a.left + a.width / 2 - c.left, y: a.top + a.height / 2 - c.top, r: Math.min(a.width, a.height) * 0.56 };
+    };
+    // 小屏、低配设备少放一些粒子；引擎自己还会在掉帧时继续降
+    const weak = innerWidth < 720 || (navigator.hardwareConcurrency ?? 8) <= 4;
+    const fmt = new Intl.NumberFormat('en-US');
 
-  const sub = (a: Vec, b: Vec): Vec => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-  const cross = (a: Vec, b: Vec): Vec => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-  const unit = (a: Vec): Vec => {
-    const l = Math.hypot(a[0], a[1], a[2]) || 1;
-    return [a[0] / l, a[1] / l, a[2] / l];
-  };
-
-  // 沿空间曲线 c(t) 包一根半径为 r 的管子（Frenet 标架）
-  const tube = (c: (t: number) => Vec, r: number) => (u: number, v: number): Vec => {
-    const t = u * TAU;
-    const e = 1e-3;
-    const p = c(t), a = c(t - e), b = c(t + e);
-    const T = unit(sub(b, a));
-    const B = unit(cross(T, [a[0] + b[0] - 2 * p[0], a[1] + b[1] - 2 * p[1], a[2] + b[2] - 2 * p[2]]));
-    const Nn = cross(B, T);
-    const cp = Math.cos(v * TAU) * r, sp = Math.sin(v * TAU) * r;
-    return [p[0] + cp * Nn[0] + sp * B[0], p[1] + cp * Nn[1] + sp * B[1], p[2] + cp * Nn[2] + sp * B[2]];
-  };
-
-  const ring = (p: (c: number, s: number) => Vec) => tube((t) => p(Math.cos(t), Math.sin(t)), 0.13);
-  const BORROMEAN = [
-    ring((c, s) => [c, s * 0.55, 0]),
-    ring((c, s) => [0, c, s * 0.55]),
-    ring((c, s) => [s * 0.55, 0, c]),
-  ];
-
-  const MODELS: Model[] = [
-    {
-      name: 'trefoil knot',
-      note: 'crossing number = 3',
-      tilt: 1.0,
-      // 写成 (2,3) 环面纽结：俯视是绕着中心孔的三瓣
-      f: tube((t) => {
-        const r = 2 + Math.cos(3 * t);
-        return [r * Math.cos(2 * t), Math.sin(3 * t), r * Math.sin(2 * t)];
-      }, 0.42),
-    },
-    {
-      name: 'möbius strip',
-      note: 'one side, one edge',
-      tilt: 0.7,
-      f: (u, v) => {
-        const t = u * TAU;
-        const s = (v - 0.5) * 0.8;
-        const r = 1 + s * Math.cos(t / 2);
-        return [r * Math.cos(t), s * Math.sin(t / 2), r * Math.sin(t)];
+    let ctrl: Pick<Sculpture, 'next' | 'refresh' | 'setScroll' | 'destroy'> | null = createSculpture(stage, {
+      count: weak ? 70_000 : 160_000,
+      // 调试用：网址带 ?hq 时不做自适应降画质
+      adaptive: !new URLSearchParams(location.search).has('hq'),
+      layout,
+      onModel,
+      onStats: ({ fps, count }) => {
+        $('hud-count')!.textContent = fmt.format(count);
+        $('hud-fps')!.textContent = fps ? String(fps) : '—';
       },
-    },
-    {
-      name: 'klein bottle',
-      note: 'non-orientable, χ = 0',
-      tilt: 0.25,
-      f: (uu, vv) => {
-        const u = uu * Math.PI, v = vv * TAU;
-        const cu = Math.cos(u), su = Math.sin(u), cv = Math.cos(v), sv = Math.sin(v);
-        const x = (-2 / 15) * cu * (3 * cv - 30 * su + 90 * cu ** 4 * su - 60 * cu ** 6 * su + 5 * cu * cv * su);
-        const y =
-          (-1 / 15) * su *
-          (3 * cv - 3 * cu ** 2 * cv - 48 * cu ** 4 * cv + 48 * cu ** 6 * cv - 60 * su + 5 * cu * cv * su -
-            5 * cu ** 3 * cv * su - 80 * cu ** 5 * cv * su + 80 * cu ** 7 * cv * su);
-        const z = (2 / 15) * (3 + 5 * cu * su) * sv;
-        return [x, y, z];
-      },
-    },
-    {
-      // 三个互相垂直的椭圆：整体扣在一起，但任意拿掉一个，剩下两个就散了
-      name: 'borromean rings',
-      note: 'no two rings are linked',
-      tilt: 0.55,
-      f: (u, v) => {
-        const k = Math.min(2, Math.floor(u * 3));
-        return BORROMEAN[k](u * 3 - k, v);
-      },
-    },
-  ];
-
-
-  type Geo = { P: Float32Array; Nn: Float32Array };
-  const cache = new Map<number, Geo>();
-
-  // 每个采样点在自己的格子里随机挪一下，画出来是均匀的点刻而不是一圈圈整齐的线。
-  // 用固定种子：每次刷新、每个模型的抖动都一样，变形时点和点才能对上。
-  const JU = new Float32Array(N);
-  const JV = new Float32Array(N);
-  {
-    let seed = 196;
-    const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296) - 0.5;
-    for (let i = 0; i < N; i++) {
-      JU[i] = rnd();
-      JV[i] = rnd();
-    }
-  }
-
-  // 采样：位置居中并缩放到单位球内（双面光照，法线朝向无所谓）
-  function geometry(i: number): Geo {
-    const hit = cache.get(i);
-    if (hit) return hit;
-    const f = MODELS[i].f;
-    const P = new Float32Array(N * 3);
-    const Nn = new Float32Array(N * 3);
-    const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
-    // 法线直接在参数空间里取差分，接缝处、几段拼起来的模型也不会算错
-    const e = 1e-5;
-    for (let a = 0; a < U; a++) {
-      for (let b = 0; b < V; b++) {
-        const i = a * V + b;
-        const u = (a + 0.5 + JU[i]) / U;
-        // 不夹到 [0, 1]：闭合曲面在 v 方向本来就是周期的，夹住反而会在接缝处堆出一条线
-        const w = (b + JV[i]) / (V - 1);
-        const p = f(u, w);
-        const k = i * 3;
-        for (let d = 0; d < 3; d++) {
-          P[k + d] = p[d];
-          lo[d] = Math.min(lo[d], p[d]);
-          hi[d] = Math.max(hi[d], p[d]);
-        }
-        Nn.set(unit(cross(sub(f(u + e, w), f(u - e, w)), sub(f(u, w + e), f(u, w - e)))), k);
-      }
-    }
-    const mid = lo.map((l, d) => (l + hi[d]) / 2);
-    let R = 0;
-    for (let k = 0; k < N * 3; k += 3) {
-      P[k] -= mid[0];
-      P[k + 1] -= mid[1];
-      P[k + 2] -= mid[2];
-      R = Math.max(R, Math.hypot(P[k], P[k + 1], P[k + 2]));
-    }
-    for (let k = 0; k < N * 3; k++) P[k] /= R;
-    const geo = { P, Nn };
-    cache.set(i, geo);
-    return geo;
-  }
-
-  const hex = (s: string): Vec => {
-    const m = /^#?([0-9a-f]{6})$/i.exec(s.trim());
-    const n = m ? parseInt(m[1], 16) : 0xffffff;
-    return [n >> 16, (n >> 8) & 255, n & 255];
-  };
-
-  function figure(canvas: HTMLCanvasElement) {
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return () => {};
-    const K2 = 4; // 相机到原点的距离
-    const LIGHT = unit([-0.5, 0.6, -0.65]); // 从观察者左上方打光
-    const IDLE = -0.0045; // 每帧自转的弧度
-    const AUTO_NEXT = 16000;
-
-    const nameEl = document.getElementById('model-name');
-    const noteEl = document.getElementById('model-note');
-    const idxEl = document.getElementById('model-idx');
-    const nextBtn = document.getElementById('model-next');
-
-    // 转台式旋转：M = Rx(tilt) · Ry(spin)，模型永远绕自己的对称轴转，不会翻到看不懂的角度
-    let spin = 0.6;
-    let tiltBase = MODELS[0].tilt;
-    let tiltFrom = tiltBase;
-    let tiltDrag = 0; // 竖直拖动带来的额外俯仰，松手后慢慢回弹
-    const matrix = () => {
-      const t = Math.max(-1.45, Math.min(1.45, tiltBase + tiltDrag));
-      const cx = Math.cos(t), sx = Math.sin(t), cy = Math.cos(spin), sy = Math.sin(spin);
-      return [cy, 0, sy, sx * sy, cx, -sx * cy, -cx * sy, sx, cx * cy];
-    };
-
-    let current = 0;
-    const P = new Float32Array(N * 3);
-    const Nn = new Float32Array(N * 3);
-    let from: Geo | null = null;
-    let to: Geo = geometry(0);
-    let morph = 1;
-    P.set(to.P);
-    Nn.set(to.Nn);
-
-    // ---------- 画布：按设备像素建一张 ImageData，点直接写进去 ----------
-    let W = 0;
-    let dot = 1; // 一个点占几个设备像素
-    let cell = 4; // 深度图一格的边长（设备像素）
-    let G = 0;
-    let img: ImageData | null = null;
-    let px = new Uint32Array(0);
-    let zbuf = new Float32Array(0);
-    const SX = new Int16Array(N);
-    const SY = new Int16Array(N);
-    const SZ = new Float32Array(N);
-    const little = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
-
-    let AMBIENT = 0.2; // 背光面的最低浓度
-    let ink: Vec = [255, 255, 255];
-    let glow: Vec = [255, 255, 255];
-    const readColors = () => {
-      const cs = getComputedStyle(document.documentElement);
-      ink = hex(cs.getPropertyValue('--fg'));
-      glow = hex(cs.getPropertyValue('--accent'));
-      // 深色底上的点要更亮一些才立得住；浅色底上墨点本身就够重
-      AMBIENT = document.documentElement.dataset.theme === 'light' ? 0.1 : 0.26;
-    };
-
-    const fit = () => {
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
-      const w = Math.round(canvas.clientWidth * dpr);
-      if (!w || w === W) return;
-      W = w;
-      canvas.width = canvas.height = W;
-      img = ctx.createImageData(W, W);
-      px = new Uint32Array(img.data.buffer);
-      dot = dpr >= 1.5 ? 2 : 1;
-      cell = Math.max(3, Math.round(W / 150));
-      G = Math.ceil(W / cell);
-      zbuf = new Float32Array(G * G);
-    };
-
-    const render = () => {
-      if (!img) return;
-      px.fill(0);
-      zbuf.fill(0);
-      const K1 = W * K2 * 0.46; // 单位球内的点投影后刚好不出界
-      const half = W / 2;
-      const [m0, m1, m2, m3, m4, m5, m6, m7, m8] = matrix();
-
-      // 第一遍：投影，并记下每个格子里离相机最近的深度
-      for (let i = 0, k = 0; i < N; i++, k += 3) {
-        const x0 = P[k], y0 = P[k + 1], z0 = P[k + 2];
-        const ooz = 1 / (K2 + m6 * x0 + m7 * y0 + m8 * z0);
-        const x = (half + K1 * ooz * (m0 * x0 + m1 * y0 + m2 * z0)) | 0;
-        const y = (half - K1 * ooz * (m3 * x0 + m4 * y0 + m5 * z0)) | 0;
-        SX[i] = x;
-        SY[i] = y;
-        SZ[i] = ooz;
-        if (x < 0 || y < 0 || x >= W || y >= W) continue;
-        const c = ((x / cell) | 0) + ((y / cell) | 0) * G;
-        if (ooz > zbuf[c]) zbuf[c] = ooz;
-      }
-
-      // 第二遍：只画没被挡住的点
-      const [ir, ig, ib] = ink;
-      const [gr, gg, gb] = glow;
-      for (let i = 0, k = 0; i < N; i++, k += 3) {
-        const x = SX[i], y = SY[i], ooz = SZ[i];
-        if (x < 0 || y < 0 || x > W - dot || y > W - dot) continue;
-        const a = Nn[k], b = Nn[k + 1], c = Nn[k + 2];
-        let nx = m0 * a + m1 * b + m2 * c;
-        let ny = m3 * a + m4 * b + m5 * c;
-        let nz = m6 * a + m7 * b + m8 * c;
-        if (nz > 0) {
-          nx = -nx;
-          ny = -ny;
-          nz = -nz;
-        }
-        const len = Math.hypot(nx, ny, nz) || 1;
-        // 曲面越是侧对相机，同一格里的深度差越大，容差要跟着放宽，否则边缘会被一格一格地啃掉
-        const cz = -nz / len;
-        const slope = Math.sqrt(Math.max(0, 1 - cz * cz)) / Math.max(0.06, cz);
-        const tol = 0.003 + Math.min(0.03, (cell / K1) * ooz * slope);
-        if (ooz < zbuf[((x / cell) | 0) + ((y / cell) | 0) * G] - tol) continue;
-        const L = Math.max(0, (nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2]) / len);
-        // 近处实、远处虚；暗部带一点主色，亮部回到前景色
-        const depth = 0.55 + 0.45 * Math.min(1, Math.max(0, (ooz - 0.2) * 7.5));
-        const alpha = (AMBIENT + (1 - AMBIENT) * Math.pow(L, 1.4)) * depth;
-        const t = Math.min(1, L * 1.1);
-        const r = gr + (ir - gr) * t, g = gg + (ig - gg) * t, bl = gb + (ib - gb) * t;
-        const A = (alpha * 255) | 0;
-        const color = little ? ((A << 24) | (bl << 16) | (g << 8) | r) >>> 0 : ((r << 24) | (g << 16) | (bl << 8) | A) >>> 0;
-        const o = x + y * W;
-        px[o] = color;
-        if (dot === 2) px[o + 1] = px[o + W] = px[o + W + 1] = color;
-      }
-      ctx.putImageData(img, 0, 0);
-    };
-
-    const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-    const stepMorph = (dt: number) => {
-      if (!from) return;
-      morph = Math.min(1, morph + dt / 80);
-      const e = ease(morph);
-      tiltBase = tiltFrom + (MODELS[current].tilt - tiltFrom) * e;
-      const fP = from.P, tP = to.P, fN = from.Nn, tN = to.Nn;
-      for (let k = 0; k < N * 3; k++) {
-        P[k] = fP[k] + (tP[k] - fP[k]) * e;
-        Nn[k] = fN[k] + (tN[k] - fN[k]) * e;
-      }
-      if (morph >= 1) from = null;
-    };
-
-    let lastInteraction = performance.now();
-    const next = () => {
-      current = (current + 1) % MODELS.length;
-      const m = MODELS[current];
-      if (nameEl) nameEl.textContent = m.name;
-      if (noteEl) noteEl.textContent = m.note;
-      if (idxEl) idxEl.textContent = String(current + 1);
-      // 从“当前画面”出发变形，切换途中再点也是连续的
-      from = { P: P.slice(), Nn: Nn.slice() };
-      tiltFrom = tiltBase;
-      to = geometry(current);
-      morph = 0;
-      lastInteraction = performance.now();
-      if (reduce) {
-        stepMorph(Infinity);
-        render();
-      }
-    };
-
-    // ---------- 拖动：水平拨动转台（带惯性），竖直调俯仰（松手回弹）；点一下换模型 ----------
-    let v = IDLE;
-    let drag: { x: number; y: number; moved: number } | null = null;
-    const perPx = () => Math.PI / Math.max(240, canvas.clientWidth);
-
-    const onDown = (e: PointerEvent) => {
-      if (e.button !== 0) return;
-      drag = { x: e.clientX, y: e.clientY, moved: 0 };
-      canvas.setPointerCapture(e.pointerId);
-      canvas.classList.add('dragging');
-      v = 0;
-      lastInteraction = performance.now();
-    };
-    const onMove = (e: PointerEvent) => {
-      if (!drag) return;
-      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-      drag.x = e.clientX;
-      drag.y = e.clientY;
-      drag.moved += Math.abs(dx) + Math.abs(dy);
-      const k = perPx();
-      spin -= dx * k;
-      tiltDrag = Math.max(-1.45 - tiltBase, Math.min(1.45 - tiltBase, tiltDrag - dy * k));
-      v = v * 0.3 - dx * k * 0.7;
-      lastInteraction = performance.now();
-      if (reduce) render();
-    };
-    const onUp = (e: PointerEvent) => {
-      if (!drag) return;
-      const click = e.type === 'pointerup' && drag.moved < 6;
-      drag = null;
-      canvas.classList.remove('dragging');
-      v = Math.max(-0.25, Math.min(0.25, v));
-      if (click) next();
-    };
-
-    let raf = 0;
-    let visible = true;
-    let last = performance.now();
-    const loop = (now: number) => {
-      const dt = Math.min(3, (now - last) / 16.667);
-      last = now;
-      if (!drag) {
-        spin += v * dt;
-        // 甩出去的速度慢慢回落到默认自转，俯仰在松手一会儿后回弹
-        v += (IDLE - v) * (1 - Math.pow(0.97, dt));
-        if (now - lastInteraction > 1200) tiltDrag *= Math.pow(0.96, dt);
-        if (now - lastInteraction > AUTO_NEXT) next();
-      } else {
-        v *= Math.pow(0.7, dt);
-      }
-      stepMorph(dt);
-      render();
-      if (visible && !document.hidden) raf = requestAnimationFrame(loop);
-    };
-    const start = () => {
-      cancelAnimationFrame(raf);
-      if (!reduce && visible && !document.hidden) {
-        last = performance.now();
-        raf = requestAnimationFrame(loop);
-      }
-    };
-    const redraw = () => {
-      fit();
-      readColors();
-      render();
-    };
-
-    redraw();
-    // 其余模型趁空闲时预先算好，切换时就不会卡一下
-    let alive = true;
-    const idle = (cb: () => void) => ('requestIdleCallback' in window ? requestIdleCallback(cb) : setTimeout(cb, 300));
-    const warm = (i: number) => {
-      if (!alive || i >= MODELS.length) return;
-      geometry(i);
-      idle(() => warm(i + 1));
-    };
-    idle(() => warm(1));
-    canvas.addEventListener('pointerdown', onDown);
-    canvas.addEventListener('pointermove', onMove);
-    canvas.addEventListener('pointerup', onUp);
-    canvas.addEventListener('pointercancel', onUp);
-    nextBtn?.addEventListener('click', next);
-    window.addEventListener('resize', redraw);
-    // 切换明暗主题后重新取色
-    const themeWatch = new MutationObserver(redraw);
-    themeWatch.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-
-    const io = new IntersectionObserver(([entry]) => {
-      visible = entry.isIntersecting;
-      start();
     });
-    io.observe(canvas);
-    document.addEventListener('visibilitychange', start);
+    if (ctrl) {
+      $('hud')!.hidden = false;
+    } else {
+      // 没有 WebGL2：换成画在占位格里的 CPU 点刻版本
+      stage.remove();
+      const canvas = document.createElement('canvas');
+      canvas.setAttribute('aria-hidden', 'true');
+      art.prepend(canvas);
+      const { createStipple } = await import('../scripts/stipple');
+      ctrl = createStipple(canvas, { onModel });
+    }
+    if (!ctrl) return;
+    const c = ctrl;
 
-    return () => {
-      alive = false;
-      cancelAnimationFrame(raf);
-      io.disconnect();
+    const nextBtn = $('model-next');
+    nextBtn?.addEventListener('click', c.next);
+    // 往下滚的时候把雕塑吹散
+    const hero = document.getElementById('hero')!;
+    const onScroll = () => c.setScroll((scrollY - hero.offsetHeight * 0.12) / (hero.offsetHeight * 0.75));
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    // 切换明暗主题、字体加载完导致布局变化后，重新取色和定位
+    const themeWatch = new MutationObserver(c.refresh);
+    themeWatch.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    const sizeWatch = new ResizeObserver(c.refresh);
+    sizeWatch.observe(art);
+    document.addEventListener('sculpture:next', c.next);
+
+    cleanup = () => {
+      window.removeEventListener('scroll', onScroll);
+      document.removeEventListener('sculpture:next', c.next);
       themeWatch.disconnect();
-      window.removeEventListener('resize', redraw);
-      document.removeEventListener('visibilitychange', start);
+      sizeWatch.disconnect();
+      c.destroy();
     };
   }
 
   function init() {
-    const canvas = document.getElementById('model') as HTMLCanvasElement | null;
-    if (canvas) stopFigure = figure(canvas);
+    sculpture();
     const typed = document.getElementById('typed');
     if (!typed || reduce) return;
     typewriter(typed, JSON.parse(typed.dataset.lines || '[]'));
@@ -726,7 +482,7 @@ const [, word = SITE.author, digits = ''] = /^(.*?)(\d+)$/.exec(SITE.author) ?? 
   document.addEventListener('astro:before-swap', () => {
     timers.forEach(clearTimeout);
     timers = [];
-    stopFigure?.();
-    stopFigure = null;
+    cleanup?.();
+    cleanup = null;
   });
 </script>

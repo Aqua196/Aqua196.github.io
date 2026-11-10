@@ -1,0 +1,220 @@
+---
+import Base from '../layouts/Base.astro';
+import { SITE, SOCIALS } from '../config';
+
+// 这一页是写给同行看的：这个站用了哪些技术、为什么这么做。
+// 每一条都对应仓库里真实存在的代码，file 是可以直接去翻的位置。
+const items = [
+  {
+    title: 'GPU 粒子雕塑',
+    file: 'src/scripts/particles.ts',
+    tags: ['WebGL2', 'Transform Feedback', 'GLSL'],
+    body: '首页那团粒子没有用 three.js，是手写的 WebGL2。每个粒子的位置和速度都存在显存里，每帧用 transform feedback 做一步积分：弹簧把它拉向曲面上的目标点，一个无散的流场让它微微浮动，鼠标射线把它推开并卷成涡旋。曲面本身（三叶结、莫比乌斯带、克莱因瓶、博罗梅安环）是在顶点着色器里按参数方程算出来的，同样用 transform feedback 烘焙一次后复用。',
+    try: '在首页拖动、快速划过、点击它，或者往下滚',
+  },
+  {
+    title: '点云的遮挡',
+    file: 'src/scripts/particles.ts',
+    tags: ['Depth pre-pass', 'gl_FragDepth'],
+    body: '点云没有面，直接画会前后透成一团。这里先用放大的圆片写一遍深度，再画真正的小圆点并做深度测试；圆片的深度从中心到边缘逐渐变远（写 gl_FragDepth），所以斜面上相邻的粒子不会互相挡掉。深色主题下再叠一层稀疏的大光斑当作便宜的 bloom。',
+  },
+  {
+    title: '渐进增强与自适应画质',
+    file: 'src/components/Hero.astro',
+    tags: ['Progressive enhancement', 'prefers-reduced-motion'],
+    body: '粒子的采样用 R2 低差异序列，任意前缀都是均匀的，所以掉帧时只要少画一些就能降画质，不用重新生成。引擎会先降像素比、再减粒子数。浏览器不支持 WebGL2 时动态加载一个 Canvas 2D 的 CPU 点刻版本；系统开了“减弱动态效果”就不跑物理，只画静止的一帧。离开视口或切到后台时循环会停。',
+  },
+  {
+    title: '命令面板',
+    file: 'src/components/Search.astro',
+    tags: ['<dialog>', 'ARIA combobox', '零依赖搜索'],
+    body: '搜索和命令共用一个面板。索引是构建时生成的一份 JSON，第一次打开才去取；匹配时做了大小写和重音折叠（搜 hastad 能找到 Håstad），而且折叠前后长度不变，命中位置可以直接拿来高亮原文。用原生 dialog 做焦点管理，上下键通过 aria-activedescendant 告诉读屏当前选中了哪一项。',
+    try: '按 Ctrl / ⌘ + K，或者直接按 > 进入命令模式',
+    action: 'search',
+  },
+  {
+    title: '浏览器里的终端',
+    file: 'src/components/Terminal.astro',
+    tags: ['解析器', '虚拟文件系统'],
+    body: '一个真的能用的小 shell：自己写的分词（支持引号）和管道，Tab 补全，历史记录。文件系统是用搜索索引现搭的，每篇文章是 posts/ 下的一个 .md，可以 ls、cat、grep、open。所有输出都走 textContent，不拼 HTML。里面还藏了一个 flag。',
+    try: '按 ` 打开，然后 cat README.md',
+    action: 'terminal',
+  },
+  {
+    title: '页面切换',
+    file: 'src/styles/global.css',
+    tags: ['View Transitions API'],
+    body: '站内跳转不整页刷新。页头单独成组，切页时原地不动；文章标题有自己的 transition name，会从列表里“飞”到文章页头。明暗主题切换是从按钮位置扩散开的一个圆，用 clip-path 驱动 view transition 的新快照。',
+    try: '从首页点进任意一篇文章，再切一下主题',
+  },
+  {
+    title: '指针效果',
+    file: 'src/scripts/fx.ts',
+    tags: ['事件委托', 'CSS 自定义属性', 'mask-composite'],
+    body: '卡片上跟着鼠标走的光斑、倾斜和按钮的磁吸，全站只有一个 pointermove 监听，用 requestAnimationFrame 合并后把坐标写进 CSS 变量，画面交给 CSS：边框高光是一个渐变层用 mask 挖掉中间只剩一圈。只在有鼠标的设备上启用。',
+  },
+  {
+    title: '页脚的水位字标',
+    file: 'src/components/Footer.astro',
+    tags: ['@property', 'Scroll-driven Animations', 'CSS mask'],
+    body: '页面最底下那行大字是纯 CSS：描边的字上面再叠一层实心的，用两层 mask（一条重复的波浪加一整块）只露出水面以下的部分。水位是一个用 @property 注册过类型的自定义属性，所以能被动画插值；在支持滚动驱动动画的浏览器里，它直接绑在滚动进度上。',
+    try: '滚到页面最底下',
+  },
+  {
+    title: '一个色相管一类东西',
+    file: 'src/styles/global.css',
+    tags: ['OKLCH', 'color-mix()'],
+    body: '分类和提示块的颜色不是一张色表，而是同一组明度、彩度只换色相的 OKLCH 颜色，深浅两套主题各有一组明度和彩度；底色、边线、悬停态都用 color-mix 从这一个颜色派生。新增一个分类只需要在配置里写一个 0 到 360 的数字。',
+  },
+  {
+    title: 'Markdown 管线',
+    file: 'src/plugins/',
+    tags: ['remark', 'rehype', 'Shiki', 'KaTeX'],
+    body: '三个自己写的插件：GitHub 风格的提示块（可折叠）、给代码块加标题栏和复制按钮的代码窗口、以及 Flag 打码。打码用的是原生 details，展开之前读屏不会读出内容；搜索索引在生成时会把 flag 和打码内容剔掉，不会从搜索里漏出去。',
+  },
+];
+---
+
+<Base title="本站是怎么做的" description="这个博客前端用到的技术：手写 WebGL2 粒子物理、命令面板、浏览器终端、View Transitions、滚动驱动动画……">
+  <div class="container">
+    <header class="page-head">
+      <div class="eyebrow" data-reveal>cat ./COLOPHON.md</div>
+      <h1 data-reveal style="--delay:.05s">Colophon</h1>
+      <p data-reveal style="--delay:.1s">
+        这个站是 {SITE.author} 自己设计和实现的：Astro 生成静态页面，交互部分全部手写，没有引入 UI 框架和动画库。下面是做的时候比较有意思的几件事。{
+          SOCIALS.github && (
+            <>
+              源码在 <a href={SOCIALS.github} target="_blank" rel="noopener">GitHub</a>。
+            </>
+          )
+        }
+      </p>
+    </header>
+
+    <ol class="list">
+      {
+        items.map((it, i) => (
+          <li class="item" data-reveal>
+            <span class="no mono">{String(i + 1).padStart(2, '0')}</span>
+            <div class="main">
+              <h2>{it.title}</h2>
+              <p>{it.body}</p>
+              {it.try && (
+                <p class="try">
+                  <span class="label">试一试</span>
+                  {it.action ? (
+                    <button type="button" {...{ [`data-open-${it.action}`]: '' }}>
+                      {it.try} <span aria-hidden="true">→</span>
+                    </button>
+                  ) : (
+                    <span>{it.try}</span>
+                  )}
+                </p>
+              )}
+            </div>
+            <div class="side mono">
+              <ul>
+                {it.tags.map((t) => <li>{t}</li>)}
+              </ul>
+              <code>{it.file}</code>
+            </div>
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+</Base>
+
+<style>
+  .list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--line);
+  }
+  .item {
+    display: grid;
+    grid-template-columns: 4rem minmax(0, 1fr) 15rem;
+    gap: 1.5rem 2.5rem;
+    padding: 2.4rem 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .no {
+    padding-top: 0.55rem;
+    font-size: 0.75rem;
+    color: var(--accent);
+  }
+  h2 {
+    margin: 0 0 0.8rem;
+    font-family: var(--font-display);
+    font-size: clamp(1.8rem, 3.6vw, 2.3rem);
+    font-weight: 400;
+    line-height: 1.2;
+  }
+  .main p {
+    max-width: 42rem;
+    margin: 0;
+    color: var(--fg-2);
+    line-height: 1.85;
+    text-wrap: pretty;
+  }
+  .try {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.4rem 0.9rem;
+    margin-top: 1.1rem !important;
+    font-size: 0.92rem;
+    color: var(--fg) !important;
+  }
+  .try .label {
+    color: var(--accent);
+  }
+  .try button {
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    text-decoration: underline;
+    text-decoration-color: var(--accent);
+    text-underline-offset: 4px;
+    cursor: pointer;
+  }
+  .try button:hover {
+    color: var(--accent);
+  }
+  .side {
+    padding-top: 0.5rem;
+    font-size: 0.72rem;
+  }
+  .side ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    list-style: none;
+    margin: 0 0 0.9rem;
+    padding: 0;
+  }
+  .side li {
+    padding: 0.25em 0.7em;
+    color: var(--fg-2);
+    border: 1px solid var(--line-2);
+    border-radius: 999px;
+  }
+  .side code {
+    color: var(--muted);
+    overflow-wrap: anywhere;
+  }
+  @media (max-width: 900px) {
+    .item {
+      grid-template-columns: 2.5rem minmax(0, 1fr);
+      gap: 1rem 1rem;
+    }
+    .side {
+      grid-column: 2;
+      padding-top: 0;
+    }
+  }
+</style>

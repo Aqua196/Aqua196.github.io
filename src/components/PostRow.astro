@@ -15,7 +15,7 @@ const { minutes } = readingStats(post.body);
 ---
 
 <li class="row" data-reveal data-tone style={`--h:${cat.hue};--delay:${Math.min(index, 10) * 0.04}s`}>
-  <a href={postUrl(post.id)}>
+  <a href={postUrl(post.id)} data-spot>
     <span class="when mono">
       <time datetime={date.toISOString()}>{formatDate(date)}</time>
       <span class="chip">{cat.label}</span>

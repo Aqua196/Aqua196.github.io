@@ -1,0 +1,698 @@
+---
+import { SITE } from '../config';
+import { url } from '../utils/url';
+
+const host = SITE.author.toLowerCase().replace(/[^a-z0-9]+/g, '') || 'blog';
+---
+
+<dialog
+  id="terminal"
+  class="term"
+  aria-label="终端"
+  data-index={url('/search.json')}
+  data-host={host}
+  data-since={SITE.since}
+  data-about={url('/about')}
+  data-home={url('/')}
+>
+  <div class="win">
+    <header class="bar mono">
+      <span class="lights" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="title" id="term-title">guest@{host}: ~</span>
+      <button type="button" class="x" id="term-close" aria-label="关闭终端">esc</button>
+    </header>
+    <div class="screen mono" id="term-screen">
+      <div id="term-out" role="log" aria-live="polite"></div>
+      <form class="line" id="term-form">
+        <label class="ps1" id="term-ps1" for="term-input">guest@{host}:~$</label>
+        <input id="term-input" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="命令" />
+      </form>
+    </div>
+  </div>
+</dialog>
+
+<style>
+  /* 终端不跟随明暗主题：它永远是黑的 */
+  .term {
+    --t-bg: #0b0e11;
+    --t-fg: #d5dbe1;
+    --t-dim: #6f7984;
+    --t-line: #1f252c;
+    --t-accent: #62e0d1;
+    --t-err: #ff8f80;
+    width: min(780px, calc(100vw - 24px));
+    height: min(500px, calc(100dvh - 96px));
+    margin: auto auto 24px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    overflow: visible;
+    color-scheme: dark;
+  }
+  .term::backdrop {
+    background: color-mix(in srgb, var(--bg) 55%, transparent);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+  }
+  .term[open] .win {
+    animation: term-in 0.35s var(--ease);
+  }
+  @keyframes term-in {
+    from {
+      opacity: 0;
+      transform: translateY(24px) scale(0.98);
+    }
+  }
+  .win {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    color: var(--t-fg);
+    background: var(--t-bg);
+    border: 1px solid var(--t-line);
+    border-radius: 14px;
+    box-shadow: 0 40px 100px -20px rgb(0 0 0 / 0.7), 0 0 0 1px rgb(255 255 255 / 0.04);
+    overflow: hidden;
+  }
+  .bar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.6rem 0.8rem 0.6rem 1rem;
+    font-size: 0.72rem;
+    color: var(--t-dim);
+    border-bottom: 1px solid var(--t-line);
+  }
+  .lights {
+    display: flex;
+    gap: 6px;
+  }
+  .lights i {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--t-line);
+  }
+  .lights i:first-child {
+    background: var(--t-accent);
+  }
+  .title {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .x {
+    padding: 0.1rem 0.5rem;
+    border: 1px solid var(--t-line);
+    border-radius: 5px;
+    background: none;
+    font: inherit;
+    color: var(--t-dim);
+    cursor: pointer;
+  }
+  .x:hover {
+    color: var(--t-fg);
+    border-color: var(--t-dim);
+  }
+  .screen {
+    flex: 1;
+    padding: 0.9rem 1rem 1rem;
+    overflow-y: auto;
+    font-size: 0.82rem;
+    line-height: 1.65;
+    cursor: text;
+    scrollbar-width: thin;
+    scrollbar-color: var(--t-line) transparent;
+  }
+  #term-out :global(div) {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  #term-out :global(.cmd) {
+    color: var(--t-fg);
+  }
+  #term-out :global(.cmd b),
+  .ps1 {
+    font-weight: 400;
+    color: var(--t-accent);
+  }
+  #term-out :global(.out) {
+    color: #aab3bc;
+  }
+  #term-out :global(.err) {
+    color: var(--t-err);
+  }
+  #term-out :global(.hi) {
+    color: var(--t-accent);
+  }
+  .line {
+    display: flex;
+    gap: 0.6em;
+  }
+  .ps1 {
+    flex: none;
+    white-space: nowrap;
+  }
+  input {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    font: inherit;
+    color: var(--t-fg);
+    caret-color: var(--t-accent);
+  }
+  @media (max-width: 560px) {
+    .term {
+      margin-bottom: 12px;
+      height: min(460px, calc(100dvh - 72px));
+    }
+    .screen {
+      /* 小于 16px 的输入框会让 iOS 自动放大页面 */
+      font-size: 16px;
+      line-height: 1.5;
+    }
+  }
+</style>
+
+<script>
+  import { navigate } from 'astro:transitions/client';
+
+  // ============================================================
+  //  一个跑在浏览器里的迷你 shell：
+  //    - 虚拟文件系统是用搜索索引（search.json）现搭的：posts/ 下每篇文章是一个 .md
+  //    - 支持管道（cat .flag | base64 -d）、引号、Tab 补全、↑↓ 历史、Ctrl+L / Ctrl+C
+  //    - 所有输出都走 textContent，不拼 HTML
+  // ============================================================
+  type Entry = {
+    title: string;
+    url: string;
+    description: string;
+    category: string;
+    categoryLabel: string;
+    tags: string[];
+    event: string;
+    date: string;
+    body: string;
+  };
+  type File = { type: 'file'; read: () => string; href?: string; date?: string; note?: string };
+  type Dir = { type: 'dir'; children: Map<string, Node> };
+  type Node = File | Dir;
+
+  const dir = (): Dir => ({ type: 'dir', children: new Map() });
+  let root: Dir | null = null;
+  let posts: Entry[] = [];
+  let loading: Promise<void> | null = null;
+  let cwd: string[] = [];
+  const history: string[] = [];
+  let cursor = 0;
+  let greeted = false;
+  let cfg = { host: 'blog', since: '', about: '/about/', home: '/' };
+
+  const slugOf = (e: Entry) => e.url.split('/').filter(Boolean).pop() ?? 'post';
+
+  function buildFs(list: Entry[]) {
+    const r = dir();
+    const postsDir = dir();
+    const cats = dir();
+    const tags = dir();
+    for (const e of list) {
+      const file: File = {
+        type: 'file',
+        href: e.url,
+        date: e.date,
+        note: e.title,
+        read: () =>
+          [
+            '---',
+            `title:    ${e.title}`,
+            `date:     ${e.date}`,
+            `category: ${e.categoryLabel}`,
+            ...(e.event ? [`event:    ${e.event}`] : []),
+            ...(e.tags.length ? [`tags:     ${e.tags.join(', ')}`] : []),
+            '---',
+            '',
+            e.description || e.body.slice(0, 160) + '…',
+            '',
+            `（全文：open ${slugOf(e)}）`,
+          ].join('\n'),
+      };
+      const name = `${slugOf(e)}.md`;
+      postsDir.children.set(name, file);
+      const c = (cats.children.get(e.category) as Dir) ?? dir();
+      c.children.set(name, file);
+      cats.children.set(e.category, c);
+      for (const t of e.tags) {
+        const key = t.replace(/[\s/]+/g, '-');
+        const d = (tags.children.get(key) as Dir) ?? dir();
+        d.children.set(name, file);
+        tags.children.set(key, d);
+      }
+    }
+    r.children.set('posts', postsDir);
+    r.children.set('categories', cats);
+    r.children.set('tags', tags);
+    r.children.set('about.md', {
+      type: 'file',
+      href: cfg.about,
+      read: () => `# about\n\n${cfg.host} 的解题笔记本。完整版：open about.md`,
+    });
+    r.children.set('README.md', {
+      type: 'file',
+      read: () =>
+        [
+          '# README',
+          '',
+          '这是一个真的能用的小终端，文件系统是用站内文章现搭的。',
+          '',
+          '  ls posts            看看有哪些文章',
+          '  cat posts/<名字>    读摘要',
+          '  open <名字>         打开全文',
+          '  grep <关键词>       全文搜索',
+          '',
+          '另外，这个目录里有一个文件没有被 ls 列出来。',
+          '它的内容被编码过——管道是你的朋友。',
+        ].join('\n'),
+    });
+    r.children.set('.flag', { type: 'file', read: () => 'ZmxhZ3t5MHVfZjB1bmRfdGgzX3Qzcm0xbjRsfQ==' });
+    return r;
+  }
+
+  async function ensureFs(url: string) {
+    if (root) return;
+    loading ??= fetch(url)
+      .then((r) => (r.ok ? r.json() : []))
+      .catch(() => [])
+      .then((data: Entry[]) => {
+        posts = data;
+        root = buildFs(data);
+      });
+    await loading;
+  }
+
+  // ---------- 路径 ----------
+  function resolve(path: string): string[] {
+    const parts = path.startsWith('/') || path.startsWith('~') ? [] : [...cwd];
+    for (const seg of path.replace(/^~/, '').split('/')) {
+      if (!seg || seg === '.') continue;
+      if (seg === '..') parts.pop();
+      else parts.push(seg);
+    }
+    return parts;
+  }
+  function lookup(parts: string[]): Node | null {
+    let node: Node = root!;
+    for (const p of parts) {
+      if (node.type !== 'dir') return null;
+      const next = node.children.get(p);
+      if (!next) return null;
+      node = next;
+    }
+    return node;
+  }
+  const show = (parts: string[]) => (parts.length ? `~/${parts.join('/')}` : '~');
+
+  /** 文件名可以省略目录和 .md：open demo-web-ssti 也能找到 posts/demo-web-ssti.md */
+  function findFile(arg: string): File | null {
+    const direct = lookup(resolve(arg)) ?? lookup(resolve(`${arg}.md`));
+    if (direct?.type === 'file') return direct;
+    const name = arg.split('/').pop()!;
+    const inPosts = lookup(['posts', name]) ?? lookup(['posts', `${name}.md`]);
+    return inPosts?.type === 'file' ? inPosts : null;
+  }
+
+  // ---------- 命令 ----------
+  class Fail extends Error {}
+  type Ctx = { stdin: string | null; close: () => void; clear: () => void };
+  type Command = (args: string[], ctx: Ctx) => string;
+
+  const b64decode = (s: string) => {
+    try {
+      return new TextDecoder().decode(Uint8Array.from(atob(s.trim()), (c) => c.charCodeAt(0)));
+    } catch {
+      throw new Fail('base64: invalid input');
+    }
+  };
+  const b64encode = (s: string) => btoa(String.fromCharCode(...new TextEncoder().encode(s)));
+  const need = (ctx: Ctx, args: string[], name: string) => {
+    if (ctx.stdin != null) return ctx.stdin;
+    const files = args.filter((a) => !a.startsWith('-'));
+    if (!files.length) throw new Fail(`${name}: 缺少输入（给个文件名，或者用管道传进来）`);
+    return files.map((f) => read(f, name)).join('\n');
+  };
+  const read = (path: string, name: string) => {
+    const node = lookup(resolve(path)) ?? findFile(path);
+    if (!node) throw new Fail(`${name}: ${path}: No such file or directory`);
+    if (node.type === 'dir') throw new Fail(`${name}: ${path}: Is a directory`);
+    return node.read();
+  };
+
+  const HELP: [string, string][] = [
+    ['ls [-a] [-l] [路径]', '列出目录'],
+    ['cd [路径]', '切换目录'],
+    ['cat <文件>', '读文件（文章会显示摘要）'],
+    ['open <文件>', '在页面里打开这篇文章'],
+    ['grep <关键词>', '全文搜索所有文章'],
+    ['tree [路径]', '树状列出'],
+    ['theme [dark|light]', '切换明暗主题'],
+    ['neofetch', '本站信息'],
+    ['base64 [-d] / rev / wc / head', '配合管道用：cat x | base64 -d'],
+    ['history / clear / exit', ''],
+  ];
+
+  const commands: Record<string, Command> = {
+    help: () =>
+      ['可用命令：', '', ...HELP.map(([c, d]) => `  ${c.padEnd(30)}${d}`), '', 'Tab 补全，↑↓ 翻历史，Ctrl+L 清屏。先 cat README.md 看看？'].join(
+        '\n',
+      ),
+    man: (a, c) => commands.help(a, c),
+    pwd: () => `/home/guest${cwd.length ? '/' + cwd.join('/') : ''}`,
+    whoami: () => 'guest',
+    echo: (args) => args.join(' '),
+    date: () => new Date().toString(),
+    uptime: () => {
+      const s = Math.max(0, Math.floor((Date.now() - new Date(cfg.since + 'T00:00:00+08:00').getTime()) / 1000));
+      return `up ${Math.floor(s / 86400)} days, ${String(Math.floor((s % 86400) / 3600)).padStart(2, '0')}:${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}`;
+    },
+    history: () => history.map((h, i) => `${String(i + 1).padStart(4)}  ${h}`).join('\n'),
+    clear: (_a, ctx) => (ctx.clear(), ''),
+    exit: (_a, ctx) => (ctx.close(), ''),
+    cd: (args) => {
+      const target = resolve(args[0] ?? '~');
+      const node = lookup(target);
+      if (!node) throw new Fail(`cd: ${args[0]}: No such file or directory`);
+      if (node.type !== 'dir') throw new Fail(`cd: ${args[0]}: Not a directory`);
+      cwd = target;
+      return '';
+    },
+    ls: (args) => {
+      const flags = args.filter((a) => a.startsWith('-')).join('');
+      const path = args.find((a) => !a.startsWith('-')) ?? '.';
+      const node = lookup(resolve(path));
+      if (!node) throw new Fail(`ls: ${path}: No such file or directory`);
+      if (node.type === 'file') return path;
+      const names = [...node.children.keys()].filter((n) => flags.includes('a') || !n.startsWith('.')).sort();
+      if (!names.length) return '';
+      if (!flags.includes('l')) return names.map((n) => (node.children.get(n)!.type === 'dir' ? `${n}/` : n)).join('   ');
+      const width = Math.max(...names.map((n) => n.length)) + 1;
+      return names
+        .map((n) => {
+          const c = node.children.get(n)!;
+          if (c.type === 'dir') return `drwxr-xr-x  ${'—'.padEnd(10)}  ${(n + '/').padEnd(width)}  ${c.children.size} 项`;
+          return `-rw-r--r--  ${(c.date ?? '—').padEnd(10)}  ${n.padEnd(width)}  ${c.note ?? ''}`;
+        })
+        .join('\n');
+    },
+    tree: (args) => {
+      const path = args[0] ?? '.';
+      const node = lookup(resolve(path));
+      if (!node || node.type !== 'dir') throw new Fail(`tree: ${path}: Not a directory`);
+      const lines = [path === '.' ? show(cwd) : path];
+      const walk = (d: Dir, prefix: string) => {
+        const names = [...d.children.keys()].filter((n) => !n.startsWith('.')).sort();
+        names.forEach((n, i) => {
+          const last = i === names.length - 1;
+          const c = d.children.get(n)!;
+          lines.push(`${prefix}${last ? '└── ' : '├── '}${n}${c.type === 'dir' ? '/' : ''}`);
+          if (c.type === 'dir') walk(c, prefix + (last ? '    ' : '│   '));
+        });
+      };
+      walk(node, '');
+      return lines.join('\n');
+    },
+    cat: (args, ctx) => need(ctx, args, 'cat'),
+    open: (args, ctx) => {
+      if (!args[0]) throw new Fail('open: 要打开哪个文件？试试 open about.md');
+      const file = findFile(args[0]);
+      if (!file) throw new Fail(`open: ${args[0]}: No such file`);
+      if (!file.href) throw new Fail(`open: ${args[0]}: 这个文件只能 cat`);
+      ctx.close();
+      navigate(file.href);
+      return '';
+    },
+    grep: (args, ctx) => {
+      const flags = args.filter((a) => a.startsWith('-')).join('');
+      const kw = args.find((a) => !a.startsWith('-'));
+      if (!kw) throw new Fail('grep: 要搜什么？');
+      const hit = (s: string) => (flags.includes('i') ? s.toLowerCase().includes(kw.toLowerCase()) : s.includes(kw));
+      if (ctx.stdin != null) return ctx.stdin.split('\n').filter(hit).join('\n');
+      const needle = kw.toLowerCase();
+      const out = posts
+        .filter((e) => `${e.title} ${e.description} ${e.tags.join(' ')} ${e.body}`.toLowerCase().includes(needle))
+        .map((e) => `posts/${slugOf(e)}.md:  ${e.title}`);
+      if (!out.length) throw new Fail(`grep: 没有文章提到 “${kw}”`);
+      return out.join('\n');
+    },
+    base64: (args, ctx) => {
+      const input = need(ctx, args, 'base64');
+      return args.includes('-d') || args.includes('--decode') ? b64decode(input) : b64encode(input);
+    },
+    rev: (args, ctx) =>
+      need(ctx, args, 'rev')
+        .split('\n')
+        .map((l) => [...l].reverse().join(''))
+        .join('\n'),
+    wc: (args, ctx) => {
+      const input = need(ctx, args, 'wc');
+      const lines = input ? input.split('\n').length : 0;
+      if (args.includes('-l')) return String(lines);
+      return `${lines} ${input.split(/\s+/).filter(Boolean).length} ${new TextEncoder().encode(input).length}`;
+    },
+    head: (args, ctx) => {
+      const i = args.indexOf('-n');
+      const n = i >= 0 ? Number(args[i + 1]) || 10 : 10;
+      const rest = i >= 0 ? args.filter((_, k) => k !== i && k !== i + 1) : args;
+      return need(ctx, rest, 'head').split('\n').slice(0, n).join('\n');
+    },
+    theme: (args) => {
+      const now = document.documentElement.dataset.theme;
+      const want = args[0] === 'dark' || args[0] === 'light' ? args[0] : now === 'light' ? 'dark' : 'light';
+      if (want !== now) document.getElementById('theme-toggle')?.click();
+      return `theme: ${want}`;
+    },
+    neofetch: () => {
+      const art = ['   .-""""-.   ', '  /        \\  ', ' |~~~~~~~~~~| ', ' |  ~~~~~~  | ', '  \\        /  ', "   '-....-'   "];
+      const gl = !!document.createElement('canvas').getContext('webgl2');
+      const info = [
+        `guest@${cfg.host}`,
+        '-'.repeat(6 + cfg.host.length),
+        `Posts:      ${posts.length}`,
+        `Categories: ${new Set(posts.map((p) => p.category)).size}`,
+        `Uptime:     ${commands.uptime([], { stdin: null, close() {}, clear() {} })}`,
+        `Theme:      ${document.documentElement.dataset.theme}`,
+        `Renderer:   ${gl ? 'WebGL2 · transform feedback' : 'Canvas 2D'}`,
+        `Viewport:   ${innerWidth}×${innerHeight} @${devicePixelRatio}x`,
+      ];
+      return Array.from({ length: Math.max(art.length, info.length) }, (_, i) => `${art[i] ?? ' '.repeat(14)}  ${info[i] ?? ''}`).join('\n');
+    },
+    sudo: () => {
+      throw new Fail('guest is not in the sudoers file. This incident will be reported.');
+    },
+    rm: () => {
+      throw new Fail('rm: 只读文件系统（幸好）');
+    },
+    vim: () => {
+      throw new Fail('这里没有编辑器，也就不用担心怎么退出了。试试 cat');
+    },
+  };
+  commands.vi = commands.nano = commands.emacs = commands.vim;
+  commands.ll = (args, ctx) => commands.ls(['-l', ...args], ctx);
+
+  // ---------- 解析：先按管道切段，再按空白切词，引号里的内容原样保留 ----------
+  function parse(line: string): string[][] {
+    const stages: string[][] = [[]];
+    let word = '';
+    let quote = '';
+    let has = false;
+    const push = () => {
+      if (has) stages[stages.length - 1].push(word);
+      word = '';
+      has = false;
+    };
+    for (const ch of line) {
+      if (quote) {
+        if (ch === quote) quote = '';
+        else word += ch;
+      } else if (ch === '"' || ch === "'") {
+        quote = ch;
+        has = true;
+      } else if (ch === '|') {
+        push();
+        stages.push([]);
+      } else if (/\s/.test(ch)) push();
+      else {
+        word += ch;
+        has = true;
+      }
+    }
+    push();
+    return stages.filter((s) => s.length);
+  }
+
+  function execute(line: string, ctx: Omit<Ctx, 'stdin'>): { text: string; error?: boolean } {
+    let stdin: string | null = null;
+    try {
+      for (const [name, ...args] of parse(line)) {
+        const cmd = Object.hasOwn(commands, name) ? commands[name] : null;
+        if (!cmd) throw new Fail(`${name}: command not found（输入 help 查看可用命令）`);
+        stdin = cmd(args, { ...ctx, stdin });
+      }
+      return { text: stdin ?? '' };
+    } catch (err) {
+      if (err instanceof Fail) return { text: err.message, error: true };
+      throw err;
+    }
+  }
+
+  // ---------- Tab 补全 ----------
+  function complete(value: string): { value: string; options?: string[] } {
+    const head = value.slice(0, value.lastIndexOf('|') + 1);
+    const stage = value.slice(head.length).replace(/^\s+/, '');
+    const pad = value.slice(head.length, value.length - stage.length);
+    const tokens = stage.split(/\s+/);
+    const last = tokens[tokens.length - 1];
+    let options: string[];
+    let base = '';
+    if (tokens.length === 1) {
+      options = Object.keys(commands).filter((c) => c.startsWith(last));
+    } else {
+      const cut = last.lastIndexOf('/') + 1;
+      base = last.slice(0, cut);
+      const node = lookup(resolve(base || '.'));
+      if (node?.type !== 'dir') return { value };
+      const partial = last.slice(cut);
+      options = [...node.children.entries()]
+        .filter(([n]) => n.startsWith(partial) && (partial.startsWith('.') || !n.startsWith('.')))
+        .map(([n, c]) => (c.type === 'dir' ? `${n}/` : n));
+    }
+    if (!options.length) return { value };
+    // 多个候选时先补到它们的公共前缀
+    let common = options[0];
+    for (const o of options) while (!o.startsWith(common)) common = common.slice(0, -1);
+    tokens[tokens.length - 1] = base + common + (options.length === 1 && !common.endsWith('/') ? ' ' : '');
+    return { value: head + pad + tokens.join(' '), options: options.length > 1 ? options : undefined };
+  }
+
+  // ---------- 界面 ----------
+  function init() {
+    const dialog = document.getElementById('terminal') as HTMLDialogElement | null;
+    if (!dialog) return;
+    const out = dialog.querySelector<HTMLElement>('#term-out')!;
+    const screen = dialog.querySelector<HTMLElement>('#term-screen')!;
+    const form = dialog.querySelector<HTMLFormElement>('#term-form')!;
+    const input = dialog.querySelector<HTMLInputElement>('#term-input')!;
+    const ps1 = dialog.querySelector<HTMLElement>('#term-ps1')!;
+    const title = dialog.querySelector<HTMLElement>('#term-title')!;
+    cfg = { host: dialog.dataset.host!, since: dialog.dataset.since!, about: dialog.dataset.about!, home: dialog.dataset.home! };
+    greeted = false;
+
+    const prompt = () => `guest@${cfg.host}:${show(cwd)}$`;
+    const sync = () => {
+      ps1.textContent = prompt();
+      title.textContent = `guest@${cfg.host}: ${show(cwd)}`;
+    };
+    const print = (text: string, cls = 'out') => {
+      if (!text) return;
+      const el = document.createElement('div');
+      el.className = cls;
+      el.textContent = text;
+      out.append(el);
+    };
+    const echo = (line: string) => {
+      const el = document.createElement('div');
+      el.className = 'cmd';
+      const b = document.createElement('b');
+      b.textContent = prompt() + ' ';
+      el.append(b, line);
+      out.append(el);
+    };
+    const bottom = () => (screen.scrollTop = screen.scrollHeight);
+    const ctx = { close: () => dialog.close(), clear: () => out.replaceChildren() };
+
+    const open = async () => {
+      if (dialog.open) return;
+      (document.getElementById('search-dialog') as HTMLDialogElement | null)?.close();
+      dialog.showModal();
+      input.focus();
+      if (!greeted) {
+        greeted = true;
+        print(`${cfg.host} writeups — tty0`, 'hi');
+        print('输入 help 查看命令。这台机器上藏着一个 flag。\n');
+      }
+      sync();
+      await ensureFs(dialog.dataset.index!);
+      bottom();
+    };
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const line = input.value.trim();
+      input.value = '';
+      echo(line);
+      if (line) {
+        if (history[history.length - 1] !== line) history.push(line);
+        cursor = history.length;
+        await ensureFs(dialog.dataset.index!);
+        const res = execute(line, ctx);
+        print(res.text, res.error ? 'err' : 'out');
+        // 找到 flag 的那一刻给点仪式感
+        if (!res.error && /^flag\{.+\}$/.test(res.text.trim())) print('\n🎉 找到了。你大概也是打 CTF 的。', 'hi');
+      }
+      sync();
+      bottom();
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (!history.length) return;
+        cursor = Math.max(0, Math.min(history.length, cursor + (e.key === 'ArrowUp' ? -1 : 1)));
+        input.value = history[cursor] ?? '';
+      } else if (e.key === 'Tab') {
+        e.preventDefault();
+        if (!root) return;
+        const res = complete(input.value);
+        input.value = res.value;
+        if (res.options) {
+          echo(input.value);
+          print(res.options.join('   '));
+          bottom();
+        }
+      } else if (e.key === 'l' && e.ctrlKey) {
+        e.preventDefault();
+        ctx.clear();
+      } else if (e.key === 'c' && e.ctrlKey && input.selectionStart === input.selectionEnd) {
+        e.preventDefault();
+        echo(input.value + '^C');
+        input.value = '';
+        bottom();
+      }
+    });
+
+    // 点终端里任何空白处都把焦点还给输入框（但不打断选中文字去复制）
+    screen.addEventListener('click', () => {
+      if (!getSelection()?.toString()) input.focus();
+    });
+    dialog.querySelector('#term-close')!.addEventListener('click', () => dialog.close());
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) dialog.close();
+    });
+    document.querySelectorAll('[data-open-terminal]').forEach((b) => b.addEventListener('click', open));
+    openTerminal = open;
+  }
+
+  let openTerminal: (() => void) | null = null;
+  document.addEventListener('terminal:open', () => openTerminal?.());
+  document.addEventListener('keydown', (e) => {
+    const el = e.target as HTMLElement;
+    const typing = el?.tagName === 'INPUT' || el?.tagName === 'TEXTAREA' || el?.isContentEditable;
+    if (e.key === '`' && !typing && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      e.preventDefault();
+      openTerminal?.();
+    }
+  });
+  document.addEventListener('astro:page-load', init);
+</script>

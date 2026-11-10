@@ -73,6 +73,18 @@
   --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
+/* 注册成带类型的自定义属性，才能被动画插值（页脚字标的水位和波浪） */
+@property --p {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0.5;
+}
+@property --wx {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0px;
+}
+
 /* 带色相的元素：在标签上写 data-tone + style="--h: 色相" */
 [data-tone] {
   --cat: oklch(var(--tone-l) var(--tone-c) var(--h, 190));
@@ -216,13 +228,15 @@ kbd {
   background: transparent;
   color: var(--fg);
   cursor: pointer;
-  transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.2s var(--ease);
+  /* --tx / --ty 由 fx.ts 的磁吸效果写入 */
+  transform: translate(var(--tx, 0), var(--ty, 0));
+  transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.35s var(--ease);
 }
 .btn:hover {
   border-color: var(--fg);
 }
 .btn:active {
-  transform: scale(0.98);
+  transform: translate(var(--tx, 0), var(--ty, 0)) scale(0.97);
 }
 .btn-primary {
   background: var(--fg);
@@ -442,6 +456,49 @@ kbd {
   }
 }
 
+/* ---------- 指针光斑：fx.ts 把指针位置写进 --mx / --my ---------- */
+[data-spot] {
+  position: relative;
+}
+/* 边框高光：一个比元素大 1px 的渐变层，用 mask 挖掉中间，只剩一圈边 */
+[data-spot]::before,
+[data-spot]::after {
+  content: '';
+  position: absolute;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s;
+}
+[data-spot]::before {
+  inset: -1px;
+  padding: 1px;
+  background: radial-gradient(220px circle at var(--mx, 50%) var(--my, 50%), var(--cat, var(--accent)), transparent 70%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+/* 内部柔光 */
+[data-spot]::after {
+  inset: 0;
+  background: radial-gradient(
+    320px circle at var(--mx, 50%) var(--my, 50%),
+    color-mix(in oklch, var(--cat, var(--accent)) 11%, transparent),
+    transparent 70%
+  );
+}
+@media (hover: hover) and (pointer: fine) {
+  [data-spot]:hover::before,
+  [data-spot]:hover::after {
+    opacity: 1;
+  }
+  [data-tilt] {
+    transform: perspective(700px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+    transition: transform 0.25s var(--ease), border-color 0.25s, background 0.25s;
+    will-change: transform;
+  }
+}
+
 /* 滚动出现 */
 .js [data-reveal] {
   opacity: 0;
@@ -454,7 +511,35 @@ kbd {
   transform: none;
 }
 
-/* 主题切换的圆形扩散动画 */
+/* ---------- 页面切换（View Transitions） ----------
+   页头单独成组，切页时原地不动；正文旧的淡出上移、新的淡入上浮。
+   文章标题另有自己的 transition:name，会从列表“飞”到文章页头。 */
+.site-header {
+  view-transition-name: site-header;
+}
+::view-transition-old(root) {
+  animation: 0.22s ease-in both vt-out;
+}
+::view-transition-new(root) {
+  animation: 0.45s var(--ease) 0.08s both vt-in;
+}
+@keyframes vt-out {
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+@keyframes vt-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+}
+
+/* 主题切换的圆形扩散动画：这时页头不单独成组，跟着整页一起被圆揭开 */
+html.theme-transition .site-header {
+  view-transition-name: none;
+}
 html.theme-transition::view-transition-old(root),
 html.theme-transition::view-transition-new(root) {
   animation: none;

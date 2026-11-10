@@ -11,6 +11,7 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import Search from '../components/Search.astro';
 import BackToTop from '../components/BackToTop.astro';
+import Terminal from '../components/Terminal.astro';
 
 interface Props {
   title?: string;
@@ -90,12 +91,15 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     </main>
     <Footer />
     <Search />
+    <Terminal />
     <BackToTop />
     <p class="sr-only" id="copy-status" aria-live="polite"></p>
   </body>
 </html>
 
 <script>
+  import '../scripts/fx';
+
   // ---------- 滚动出现 ----------
   function initReveal() {
     const els = document.querySelectorAll<HTMLElement>('[data-reveal]:not(.is-visible)');

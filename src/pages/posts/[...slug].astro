@@ -135,7 +135,7 @@ const hasChal = d.event || d.difficulty || d.points != null || d.solves != null 
         <nav class="pager" aria-label="上一篇 / 下一篇">
           {
             older ? (
-              <a class="pg" href={postUrl(older.id)}>
+              <a class="pg" href={postUrl(older.id)} data-spot>
                 <span class="label">← 上一篇</span>
                 <span class="t">{older.data.title}</span>
               </a>
@@ -145,7 +145,7 @@ const hasChal = d.event || d.difficulty || d.points != null || d.solves != null 
           }
           {
             newer && (
-              <a class="pg next" href={postUrl(newer.id)}>
+              <a class="pg next" href={postUrl(newer.id)} data-spot>
                 <span class="label">下一篇 →</span>
                 <span class="t">{newer.data.title}</span>
               </a>
@@ -391,7 +391,6 @@ const hasChal = d.event || d.difficulty || d.points != null || d.solves != null 
     transition: border-color 0.25s, transform 0.3s var(--ease);
   }
   .pg:hover {
-    border-color: var(--muted);
     transform: translateY(-2px);
   }
   .pg:hover .label {
