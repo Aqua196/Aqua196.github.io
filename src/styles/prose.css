@@ -18,49 +18,44 @@
 .prose h4 {
   text-wrap: balance;
   line-height: 1.4;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
   scroll-margin-top: calc(var(--header-h) + 24px);
 }
 
 /* h2 自动编号：01 / 02 / 03 … */
 .prose h2 {
   counter-increment: h2;
-  margin: 3.2em 0 1em;
-  padding-top: 0.7em;
-  font-size: 1.5rem;
-  font-weight: 750;
-  border-top: 1px solid var(--fg);
+  margin: 3.4em 0 1em;
+  padding-top: 1.1em;
+  font-size: 1.6rem;
+  font-weight: 700;
+  border-top: 1px solid var(--line);
 }
 .prose h2::before {
   content: counter(h2, decimal-leading-zero);
   display: block;
-  margin-bottom: 0.3em;
+  margin-bottom: 0.5em;
   font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 500;
-  letter-spacing: 0.1em;
-  color: var(--muted);
+  letter-spacing: 0.12em;
+  color: var(--cat, var(--accent));
 }
 .prose h3 {
-  margin: 2.2em 0 0.7em;
-  font-size: 1.2rem;
-  font-weight: 700;
-}
-.prose h3::before {
-  content: '→ ';
-  font-family: var(--font-mono);
-  font-weight: 400;
-  color: var(--muted);
+  margin: 2.4em 0 0.7em;
+  font-size: 1.22rem;
+  font-weight: 650;
 }
 .prose h4 {
   margin: 1.8em 0 0.6em;
   font-size: 1.05rem;
+  font-weight: 650;
 }
 
 .prose p,
 .prose ul,
 .prose ol {
-  margin: 1.1em 0;
+  margin: 1.15em 0;
 }
 .prose p,
 .prose li {
@@ -68,15 +63,18 @@
 }
 .prose ul,
 .prose ol {
-  padding-left: 1.5em;
-}
-.prose ul {
-  list-style: square;
+  padding-left: 1.4em;
 }
 .prose li {
-  margin: 0.35em 0;
+  margin: 0.4em 0;
+  padding-left: 0.2em;
 }
-.prose li::marker {
+.prose ul > li::marker {
+  color: var(--cat, var(--accent));
+}
+.prose ol > li::marker {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
   color: var(--muted);
 }
 .prose li > p {
@@ -87,20 +85,20 @@
   padding-left: 0;
 }
 .prose input[type='checkbox'] {
-  accent-color: var(--fg);
+  accent-color: var(--accent);
   margin-right: 0.4em;
 }
 
 .prose a {
+  color: var(--fg);
   text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 3px;
-  transition: background 0.12s, color 0.12s;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 4px;
+  transition: color 0.2s;
 }
 .prose a:hover {
-  background: var(--fg);
-  color: var(--bg);
-  text-decoration: none;
+  color: var(--accent);
 }
 
 .prose strong {
@@ -113,75 +111,80 @@
   color: var(--muted);
 }
 .prose mark {
-  background: var(--fg);
-  color: var(--bg);
-  padding: 0 0.15em;
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  color: inherit;
+  padding: 0.05em 0.25em;
+  border-radius: 4px;
 }
 
 .prose hr {
   border: none;
-  margin: 3em 0;
+  margin: 3.2em 0;
   text-align: center;
   overflow: visible;
 }
 .prose hr::after {
-  content: '* * *';
+  content: '· · ·';
   font-family: var(--font-mono);
-  letter-spacing: 0.5em;
+  letter-spacing: 0.6em;
   color: var(--muted);
 }
 
 /* 行内代码 */
 .prose :not(pre) > code {
   font-family: var(--font-mono);
-  font-size: 0.85em;
-  padding: 0.1em 0.35em;
-  background: var(--bg-2);
-  border: 1px solid var(--line);
+  font-size: 0.84em;
+  padding: 0.16em 0.42em;
+  background: var(--bg-3);
+  border-radius: 6px;
   word-break: break-word;
 }
 .prose a code {
-  background: none;
-  border: none;
   color: inherit;
 }
 
 /* 普通引用 */
 .prose blockquote {
-  margin: 1.5em 0;
-  padding: 0.1em 0 0.1em 1.2em;
-  border-left: 2px solid var(--fg);
+  margin: 1.6em 0;
+  padding: 0.1em 0 0.1em 1.3em;
+  border-left: 2px solid var(--cat, var(--accent));
   color: var(--fg-2);
 }
 .prose blockquote p {
   margin: 0.5em 0;
 }
 
-/* 表格 */
+/* 表格：只留横线 */
 .prose table {
   display: block;
   width: max-content;
   max-width: 100%;
   overflow-x: auto;
-  margin: 1.6em 0;
+  margin: 1.8em 0;
   border-collapse: collapse;
-  font-size: 0.92rem;
+  font-size: 0.93rem;
+  line-height: 1.6;
 }
 .prose th,
 .prose td {
-  padding: 0.55em 1.1em;
-  border: 1px solid var(--line);
+  padding: 0.7em 1.6em 0.7em 0;
+  border-bottom: 1px solid var(--line);
   text-align: left;
+  vertical-align: top;
 }
 .prose th {
+  padding-top: 0;
   font-family: var(--font-mono);
-  font-size: 0.8em;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  border-bottom: 1px solid var(--fg);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom-color: var(--line-2);
+  white-space: nowrap;
 }
-.prose tbody tr:hover {
-  background: var(--bg-2);
+.prose tbody tr:last-child td {
+  border-bottom: none;
 }
 
 /* 图片 */
@@ -191,6 +194,7 @@
   height: auto;
   margin: 2em auto;
   border: 1px solid var(--line);
+  border-radius: var(--radius);
   cursor: zoom-in;
 }
 html.lightbox-open {
@@ -210,27 +214,32 @@ html.lightbox-open {
 .lightbox[open] {
   display: grid;
   place-items: center;
-  animation: lightbox-in 0.2s var(--ease);
+  animation: lightbox-in 0.25s var(--ease);
 }
 .lightbox::backdrop {
-  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
 }
 .lightbox img {
   max-width: 100%;
   max-height: calc(100vh - 48px);
-  border: 1px solid var(--fg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 @keyframes lightbox-in {
   from {
     opacity: 0;
+    transform: scale(0.97);
   }
 }
 
 /* 折叠 */
 .prose details:not(.callout, .toc-mobile) {
-  margin: 1.4em 0;
-  padding: 0.6em 1em;
+  margin: 1.5em 0;
+  padding: 0.7em 1.1em;
   border: 1px solid var(--line-2);
+  border-radius: var(--radius);
 }
 .prose details:not(.callout, .toc-mobile) > summary {
   cursor: pointer;
@@ -250,71 +259,92 @@ html.lightbox-open {
 
 /* 脚注 */
 .prose .footnotes {
-  margin-top: 3em;
+  margin-top: 3.5em;
+  padding-top: 1.2em;
+  border-top: 1px solid var(--line);
   font-size: 0.88rem;
   color: var(--fg-2);
 }
 .prose .footnotes h2 {
-  font-size: 0.9rem;
-  border-top-color: var(--line);
+  counter-increment: none;
+  margin: 0 0 0.8em;
+  padding: 0;
+  border: none;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+.prose .footnotes h2::before {
+  content: none;
+}
+.prose sup a {
+  text-decoration: none;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  padding: 0 0.15em;
 }
 
 /* ============================================================
    代码窗口
    ============================================================ */
 .code-window {
-  margin: 1.7em 0;
-  border: 1px solid var(--line-2);
+  margin: 1.8em 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
   background: var(--code-bg);
+  overflow: hidden;
 }
 .code-header {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 0.35rem 0.4rem 0.35rem 1rem;
+  gap: 0.9rem;
+  padding: 0.45rem 0.5rem 0.45rem 1.1rem;
   font-family: var(--font-mono);
   font-size: 0.72rem;
   color: var(--muted);
-  border-bottom: 1px solid var(--line-2);
+  border-bottom: 1px solid var(--line);
 }
 .code-title {
   flex: 1;
   min-width: 0;
-  color: var(--fg);
+  color: var(--fg-2);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .code-lang {
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 .code-copy {
-  padding: 0.12rem 0.55rem;
-  border: 1px solid var(--line-2);
-  background: transparent;
+  padding: 0.25rem 0.7rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--bg-3);
   font-family: var(--font-mono);
   font-size: 0.7rem;
-  color: var(--fg);
+  color: var(--fg-2);
   cursor: pointer;
-  transition: background 0.12s, color 0.12s;
+  transition: background 0.2s, color 0.2s;
 }
 .code-copy:hover {
-  background: var(--fg);
-  color: var(--bg);
-  border-color: var(--fg);
+  background: var(--accent);
+  color: var(--accent-fg);
 }
 
 .code-window pre {
   margin: 0;
-  padding: 0.9rem 0;
+  padding: 1rem 0;
   overflow-x: auto;
   background: transparent !important;
   font-family: var(--font-mono);
   font-size: 0.85rem;
-  line-height: 1.7;
+  line-height: 1.75;
   tab-size: 4;
   counter-reset: line;
+  scrollbar-width: thin;
 }
 .code-window pre code {
   display: block;
@@ -330,15 +360,15 @@ html.lightbox-open {
   counter-increment: line;
   content: counter(line);
   display: inline-block;
-  width: 3.2em;
-  padding-right: 1.2em;
+  width: 3.4em;
+  padding-right: 1.3em;
   text-align: right;
   color: var(--muted);
-  opacity: 0.5;
+  opacity: 0.55;
   user-select: none;
 }
 .code-window .line:hover {
-  background: var(--bg-3);
+  background: color-mix(in srgb, var(--fg) 5%, transparent);
 }
 /* 命令行 / 纯文本不显示行号 */
 .code-window:is([data-lang='text'], [data-lang='sh'], [data-lang='bash'], [data-lang='shell'], [data-lang='console'])
@@ -366,28 +396,55 @@ html.lightbox-open {
 
 /* ============================================================
    提示块 > [!TIP]
+   每种类型一个色相，其余（底色、边线、标签）都从它派生
    ============================================================ */
 .callout {
-  margin: 1.7em 0;
-  padding: 0.9em 1.1em;
-  border: 1px solid var(--line-2);
-  background: var(--bg-2);
+  --h: 250;
+  --tone: oklch(var(--tone-l) var(--tone-c) var(--h));
+  margin: 1.8em 0;
+  padding: 1em 1.2em;
+  border: 1px solid color-mix(in oklch, var(--tone) 28%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in oklch, var(--tone) 7%, transparent);
+}
+.callout:is(.callout-tip, .callout-hint, .callout-success, .callout-check, .callout-done) {
+  --h: 155;
+}
+.callout:is(.callout-info, .callout-todo, .callout-abstract, .callout-summary, .callout-example) {
+  --h: 200;
+}
+.callout:is(.callout-warning, .callout-caution, .callout-attention, .callout-question) {
+  --h: 75;
+}
+.callout:is(.callout-danger, .callout-bug, .callout-error, .callout-failure, .callout-fail) {
+  --h: 25;
+}
+.callout-important {
+  --h: 305;
 }
 .callout-title {
   display: flex;
   align-items: center;
-  gap: 0.7em;
+  gap: 0.8em;
   font-weight: 650;
 }
 .callout-label {
   flex: none;
-  padding: 0.05em 0.5em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
-  background: var(--fg);
-  color: var(--bg);
+  letter-spacing: 0.12em;
+  color: var(--tone);
+}
+.callout-label::before {
+  content: '';
+  width: 0.55em;
+  height: 0.55em;
+  border-radius: 50%;
+  background: currentColor;
 }
 summary.callout-title {
   cursor: pointer;
@@ -400,12 +457,14 @@ summary.callout-title::after {
   content: '+';
   margin-left: auto;
   font-family: var(--font-mono);
+  font-weight: 400;
+  color: var(--muted);
 }
 details.callout[open] > summary.callout-title::after {
   content: '−';
 }
 .callout-body {
-  margin-top: 0.5em;
+  margin-top: 0.4em;
 }
 .callout-body > :first-child {
   margin-top: 0;
@@ -413,20 +472,18 @@ details.callout[open] > summary.callout-title::after {
 .callout-body > :last-child {
   margin-bottom: 0;
 }
-/* 警告类：加粗边框 */
-.callout:is(.callout-warning, .callout-caution, .callout-danger, .callout-bug, .callout-important) {
-  border: 1px solid var(--fg);
-  border-left-width: 4px;
-}
 .callout-quote {
   background: transparent;
+  border-color: var(--line-2);
   border-style: dashed;
+}
+.callout-quote .callout-label {
+  color: var(--muted);
 }
 
 /* Flag：收起时只显示一根“涂黑”的条，点击（或回车）展开。用原生 <details>，读屏在展开前不会读出内容 */
 .callout-flag {
-  background: transparent;
-  border: 1px solid var(--fg);
+  --tone: var(--accent);
 }
 .callout-flag > summary::after {
   content: none;
@@ -434,38 +491,44 @@ details.callout[open] > summary.callout-title::after {
 .callout-redact {
   flex: 1;
   max-width: 22rem;
-  height: 1.15em;
+  height: 1.2em;
+  border-radius: 4px;
   background: var(--fg);
+  transition: opacity 0.2s;
 }
-.callout-hint {
+/* 注意：.callout-hint 同时也是 [!HINT] 提示块本身的类名，所以这里必须限定成 span */
+span.callout-hint {
   font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 400;
   color: var(--muted);
+  transition: color 0.2s;
 }
-.callout-flag > summary:hover .callout-hint {
-  color: var(--fg);
-  text-decoration: underline;
-  text-underline-offset: 3px;
+.callout-flag > summary:hover .callout-redact {
+  opacity: 0.8;
+}
+.callout-flag > summary:hover span.callout-hint {
+  color: var(--accent);
 }
 .callout-flag[open] .callout-redact,
-.callout-flag[open] .callout-hint {
+.callout-flag[open] span.callout-hint {
   display: none;
 }
 .callout-flag .callout-body {
-  margin-top: 0.7em;
+  margin-top: 0.6em;
   font-family: var(--font-mono);
+  font-size: 0.95em;
   overflow-wrap: anywhere;
 }
 .callout-flag .callout-body code {
   background: none;
-  border: none;
   padding: 0;
 }
 
 /* 行内打码：Base.astro 里给它加了 role=button / tabindex，键盘也能揭示 */
 .spoiler {
-  padding: 0 0.2em;
+  padding: 0 0.25em;
+  border-radius: 4px;
   background: var(--fg);
   color: transparent;
   cursor: pointer;

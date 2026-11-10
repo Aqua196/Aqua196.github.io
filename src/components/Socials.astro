@@ -1,8 +1,10 @@
 ---
 interface Props {
   socials: Record<string, string>;
+  /** 页脚里是 <li> 列表，关于页里是一排链接 */
+  inline?: boolean;
 }
-const { socials } = Astro.props;
+const { socials, inline = false } = Astro.props;
 
 const LABELS: Record<string, string> = {
   github: 'GitHub',
@@ -20,16 +22,30 @@ const items = Object.entries(socials)
 ---
 
 {
-  items.map(({ label, href }) => (
-    <a class="social" href={href} target="_blank" rel="noopener">
-      {label} ↗
-    </a>
-  ))
+  items.map(({ label, href }) =>
+    inline ? (
+      <a class="social" href={href} target="_blank" rel="noopener">
+        {label} <span aria-hidden="true">↗</span>
+      </a>
+    ) : (
+      <li>
+        <a class="social" href={href} target="_blank" rel="noopener">
+          {label} <span aria-hidden="true">↗</span>
+        </a>
+      </li>
+    ),
+  )
 }
 
 <style>
-  .social:hover {
-    text-decoration: underline;
-    text-underline-offset: 3px;
+  .social span {
+    display: inline-block;
+    font-size: 0.85em;
+    color: var(--muted);
+    transition: transform 0.25s var(--ease), color 0.2s;
+  }
+  .social:hover span {
+    color: inherit;
+    transform: translate(2px, -2px);
   }
 </style>

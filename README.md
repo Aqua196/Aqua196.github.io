@@ -1,10 +1,10 @@
 # Writeup Lab
 
-基于 [Astro](https://astro.build) 的静态博客，用来放 CTF / 算法题的解题 writeup，部署在 GitHub Pages。黑白配色，没有评论、点赞这类功能。
+基于 [Astro](https://astro.build) 的静态博客，用来放 CTF / 算法题的解题 writeup，部署在 GitHub Pages。衬线大标题 + 等宽小字的杂志式排版，一个水色主色，每个分类有自己的代表色；没有评论、点赞这类功能。
 
 ## 功能
 
-- 首页：实时渲染的 ASCII 圆环、打字机效果、标签跑马灯、分类索引
+- 首页：canvas 实时渲染的点刻曲面（三叶结 / 莫比乌斯带 / 克莱因瓶 / 博罗梅安环，可拖动、可切换）、打字机效果、分类索引
 - 文章：题目信息卡（比赛 / 分值 / 解出数 / 难度）、自动编号标题、吸顶目录、阅读进度
 - Markdown 增强：代码窗口（文件名、行号、复制按钮）、KaTeX 数学公式、GitHub 风格提示块、可折叠 Hint、**Flag 黑条打码**
 - 全站搜索（<kbd>Ctrl</kbd> + <kbd>K</kbd> 或 <kbd>/</kbd>），支持正文内容
@@ -38,9 +38,10 @@ npm run new -- hitcon-2026-babyheap pwn
 | --- | --- |
 | 站名、ID、简介、首页轮播短语、建站日期 | `src/config.ts` → `SITE` |
 | 社交链接 | `src/config.ts` → `SOCIALS` |
-| 分类名称 | `src/config.ts` → `CATEGORIES` |
+| 分类名称和代表色 | `src/config.ts` → `CATEGORIES`（`hue` 是色相，0~360） |
 | 关于页 | `src/pages/about.md` |
-| 主题颜色 | `src/styles/global.css` 顶部的变量 |
+| 主题颜色 | `src/styles/global.css` 顶部的变量（主色是 `--accent`，明暗两套各改一处） |
+| 字体 | `src/styles/global.css` 的 `--font-display` / `--font-body` / `--font-mono` |
 | 代码高亮主题 | `astro.config.mjs` → `shikiConfig.themes` |
 
 ## 部署到 GitHub Pages

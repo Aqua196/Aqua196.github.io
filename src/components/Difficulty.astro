@@ -5,6 +5,6 @@ interface Props {
 const { value } = Astro.props;
 ---
 
-<span class="diff" title={`难度 ${value}/5`} aria-label={`难度 ${value}/5`}>
-  {Array.from({ length: 5 }, (_, i) => <span class:list={{ off: i >= value }}>■</span>)}
+<span class="diff" role="img" title={`难度 ${value}/5`} aria-label={`难度 ${value}/5`}>
+  {Array.from({ length: 5 }, (_, i) => <i class:list={{ on: i < value }} />)}
 </span>

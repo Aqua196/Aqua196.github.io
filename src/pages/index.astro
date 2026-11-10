@@ -3,65 +3,30 @@ import Base from '../layouts/Base.astro';
 import Hero from '../components/Hero.astro';
 import PostRow from '../components/PostRow.astro';
 import Empty from '../components/Empty.astro';
-import { SITE } from '../config';
+import { CATEGORIES, SITE } from '../config';
 import { getHomePosts, countBy, categoryMeta, tagGroups } from '../utils/posts';
 import { url, categoryUrl, tagUrl } from '../utils/url';
 
 const posts = await getHomePosts();
-const categories = countBy(posts, (p) => p.data.category);
+const counts = new Map(countBy(posts, (p) => p.data.category));
 const tags = tagGroups(posts);
 const latest = posts.slice(0, SITE.homePostCount);
 
-// 跑马灯：用标签，还没有标签时用首页标语；不够长就重复几遍
-let ticker = tags.length ? tags.map((t) => t.name) : [...SITE.taglines];
-while (ticker.length > 0 && ticker.length < 14) ticker = ticker.concat(ticker);
+// 分类索引：config 里登记的方向全部列出来（没文章的显示为空位），再补上文章里用到但没登记的
+const categories = [...new Set([...Object.keys(CATEGORIES), ...counts.keys()])].map((key) => ({
+  key,
+  ...categoryMeta(key),
+  count: counts.get(key) ?? 0,
+}));
 ---
 
 <Base>
-  <Hero postCount={posts.length} categoryCount={categories.length} tagCount={tags.length} />
-
-  {
-    ticker.length > 0 && (
-      <div class="ticker mono" aria-hidden="true">
-        <div class="track">
-          {[0, 1].map(() => (
-            <div class="row">
-              {ticker.map((t) => (
-                <span>{t}</span>
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  {
-    categories.length > 0 && (
-      <section class="container block">
-        <div class="section-head" data-reveal>
-          <h2>
-            <span data-scramble>Index</span>
-            <span class="zh">分类</span>
-          </h2>
-          <a href={url('/categories')}>all categories →</a>
-        </div>
-        <div class="cats" data-reveal>
-          {categories.map(([key, n]) => (
-            <a href={categoryUrl(key)}>
-              <span class="name mono">{categoryMeta(key).label}</span>
-              <span class="n mono">{String(n).padStart(2, '0')}</span>
-            </a>
-          ))}
-        </div>
-      </section>
-    )
-  }
+  <Hero postCount={posts.length} categoryCount={counts.size} tagCount={tags.length} />
 
   <section class="container block" id="latest">
     <div class="section-head" data-reveal>
-      <h2><span data-scramble>Latest</span><span class="zh">最新文章</span></h2>
-      <a href={url('/archive')}>view all →</a>
+      <h2>Latest<span class="zh">最新文章</span></h2>
+      {posts.length > 0 && <a class="more-link" href={url('/archive')}>view all</a>}
     </div>
     {
       latest.length > 0 ? (
@@ -78,28 +43,47 @@ while (ticker.length > 0 && ticker.length < 14) ticker = ticker.concat(ticker);
       posts.length > latest.length && (
         <div class="more">
           <a class="btn" href={url('/archive')}>
-            查看全部 {posts.length} 篇 →
+            查看全部 {posts.length} 篇 <span class="arr" aria-hidden="true">→</span>
           </a>
         </div>
       )
     }
   </section>
 
+  <section class="container block">
+    <div class="section-head" data-reveal>
+      <h2>Index<span class="zh">分类</span></h2>
+      {counts.size > 0 && <a class="more-link" href={url('/categories')}>all categories</a>}
+    </div>
+    <ul class="cats" data-reveal>
+      {
+        categories.map(({ key, label, hue, count }) => {
+          const Tag = count > 0 ? 'a' : 'div';
+          return (
+            <li data-tone style={`--h:${hue}`}>
+              <Tag class:list={['cat', { off: count === 0 }]} href={count > 0 ? categoryUrl(key) : undefined}>
+                <span class="chip">{label}</span>
+                <span class="count">{String(count).padStart(2, '0')}</span>
+              </Tag>
+            </li>
+          );
+        })
+      }
+    </ul>
+  </section>
+
   {
     tags.length > 0 && (
       <section class="container block">
         <div class="section-head" data-reveal>
-          <h2>
-            <span data-scramble>Tags</span>
-            <span class="zh">标签</span>
-          </h2>
-          <a href={url('/tags')}>all tags →</a>
+          <h2>Tags<span class="zh">标签</span></h2>
+          <a class="more-link" href={url('/tags')}>all tags</a>
         </div>
-        <div class="tags mono" data-reveal>
+        <div class="tags" data-reveal>
           {tags.slice(0, 30).map((t) => (
-            <a href={tagUrl(t.name)}>
-              #{t.name}
-              <sup>{t.posts.length}</sup>
+            <a class="tag" href={tagUrl(t.name)}>
+              {t.name}
+              <span class="n">{t.posts.length}</span>
             </a>
           ))}
         </div>
@@ -110,99 +94,57 @@ while (ticker.length > 0 && ticker.length < 14) ticker = ticker.concat(ticker);
 
 <style>
   .block {
-    margin-top: 5rem;
+    margin-top: 6.5rem;
   }
-
-  /* ---------- 标签跑马灯：上下两条细线夹住的一行等宽字 ---------- */
-  .ticker {
-    overflow: hidden;
-    border-block: 1px solid var(--line-2);
-    color: var(--fg-2);
-    padding: 0.85rem 0;
-    mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
-    -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
-  }
-  .track {
-    display: flex;
-    width: max-content;
-    animation: marquee 45s linear infinite;
-  }
-  .ticker:hover .track {
-    animation-play-state: paused;
-  }
-  .row {
-    display: flex;
-    font-size: 0.85rem;
-    letter-spacing: 0.04em;
-    white-space: nowrap;
-  }
-  .row span::after {
-    content: '✕';
-    margin: 0 1.6rem;
-    font-size: 0.6em;
-    vertical-align: 0.2em;
-    color: var(--muted);
-  }
-  @keyframes marquee {
-    to {
-      transform: translateX(-50%);
-    }
+  .more {
+    margin-top: 2rem;
   }
 
   /* ---------- 分类 ---------- */
   .cats {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
-    border-top: 1px solid var(--line);
-    border-left: 1px solid var(--line);
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 138px), 1fr));
+    gap: 0.75rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
   }
-  .cats a {
+  .cat {
     display: flex;
-    align-items: baseline;
+    flex-direction: column;
     justify-content: space-between;
-    padding: 1rem 1.1rem;
-    border-right: 1px solid var(--line);
-    border-bottom: 1px solid var(--line);
-    transition: background 0.12s, color 0.12s;
+    gap: 2.2rem;
+    height: 100%;
+    padding: 1.1rem 1.2rem 1rem;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    transition: border-color 0.25s, background 0.25s, transform 0.3s var(--ease);
   }
-  .cats a:hover {
-    background: var(--fg);
-    color: var(--bg);
+  a.cat:hover {
+    border-color: var(--cat-line);
+    background: color-mix(in oklch, var(--cat) 7%, var(--bg-2));
+    transform: translateY(-3px);
   }
-  .name {
-    font-size: 0.85rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+  .count {
+    font-family: var(--font-display);
+    font-size: 2.6rem;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
   }
-  .n {
-    font-size: 1.5rem;
-    font-weight: 700;
-    letter-spacing: -0.03em;
+  .cat.off {
+    background: transparent;
+    border-style: dashed;
   }
-
-  .more {
-    margin-top: 2rem;
+  .cat.off .chip,
+  .cat.off .count {
+    color: var(--muted);
+    opacity: 0.6;
   }
 
   .tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.4rem 0.5rem;
-  }
-  .tags a {
-    font-size: 0.82rem;
-    padding: 0.2rem 0.55rem;
-    border: 1px solid var(--line-2);
-    transition: background 0.12s, color 0.12s, border-color 0.12s;
-  }
-  .tags a:hover {
-    background: var(--fg);
-    color: var(--bg);
-    border-color: var(--fg);
-  }
-  .tags sup {
-    margin-left: 0.15rem;
-    opacity: 0.55;
+    gap: 0.5rem;
   }
 </style>

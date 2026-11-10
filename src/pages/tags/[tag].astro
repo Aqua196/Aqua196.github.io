@@ -21,8 +21,8 @@ const { name: tag, posts } = Astro.props;
 <Base title={`#${tag}`} description={`标签 ${tag} 下的 writeup`}>
   <div class="container">
     <header class="page-head">
-      <div class="eyebrow" data-reveal>$ grep -rl "#{tag}" ./writeups</div>
-      <h1 data-reveal style="--delay:.05s">#{tag}</h1>
+      <div class="eyebrow" data-reveal>grep -rl "#{tag}" ./writeups</div>
+      <h1 data-reveal style="--delay:.05s"><i aria-hidden="true">#</i>{tag}</h1>
       <p data-reveal style="--delay:.1s">
         共 {posts.length} 篇 · <a href={url('/tags')}>全部标签</a>
       </p>
@@ -32,3 +32,10 @@ const { name: tag, posts } = Astro.props;
     </ol>
   </div>
 </Base>
+
+<style>
+  h1 i {
+    color: var(--accent);
+    margin-right: 0.08em;
+  }
+</style>

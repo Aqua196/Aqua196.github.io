@@ -8,7 +8,7 @@ const { headings } = Astro.props;
 ---
 
 <aside class="toc" aria-label="目录">
-  <div class="label">Contents</div>
+  <div class="label">On this page</div>
   <ol id="toc-list">
     {
       headings.map((h) => (
@@ -28,26 +28,26 @@ const { headings } = Astro.props;
     top: calc(var(--header-h) + 32px);
     max-height: calc(100vh - var(--header-h) - 64px);
     overflow-y: auto;
+    scrollbar-width: thin;
   }
   .label {
-    padding-bottom: 0.6rem;
-    margin-bottom: 0.4rem;
-    border-bottom: 1px solid var(--fg);
-    color: var(--fg);
+    margin-bottom: 0.9rem;
   }
   ol {
     list-style: none;
     margin: 0;
     padding: 0;
+    border-left: 1px solid var(--line);
   }
   li a {
     display: block;
+    margin-left: -1px;
     padding: 0.32rem 0 0.32rem 1rem;
     font-size: 0.85rem;
     line-height: 1.5;
     color: var(--muted);
-    border-left: 1px solid var(--line);
-    transition: color 0.15s, border-color 0.15s;
+    border-left: 1px solid transparent;
+    transition: color 0.2s, border-color 0.2s;
   }
   li.d3 a {
     padding-left: 1.9rem;
@@ -57,13 +57,8 @@ const { headings } = Astro.props;
     color: var(--fg);
   }
   li a.active {
-    color: var(--fg);
-    font-weight: 600;
-    border-left: 2px solid var(--fg);
-    padding-left: calc(1rem - 1px);
-  }
-  li.d3 a.active {
-    padding-left: calc(1.9rem - 1px);
+    color: var(--accent);
+    border-left-color: var(--accent);
   }
   @media (max-width: 1100px) {
     .toc {

@@ -18,14 +18,14 @@ interface Props {
   posts: Post[];
 }
 const { category, posts } = Astro.props;
-const label = categoryMeta(category).label;
+const { label, hue } = categoryMeta(category);
 ---
 
 <Base title={`分类 · ${label}`} description={`${label} 方向的全部 writeup`}>
-  <div class="container">
+  <div class="container" data-tone style={`--h:${hue}`}>
     <header class="page-head">
-      <div class="eyebrow" data-reveal>$ cd ./categories/{category}</div>
-      <h1 data-reveal style="--delay:.05s"><span data-scramble data-scramble-load>{label}</span></h1>
+      <div class="eyebrow" data-reveal>cd ./categories/{category}</div>
+      <h1 data-reveal style="--delay:.05s">{label}<i aria-hidden="true">.</i></h1>
       <p data-reveal style="--delay:.1s">
         共 {posts.length} 篇 · <a href={url('/categories')}>全部分类</a>
       </p>
@@ -35,3 +35,9 @@ const label = categoryMeta(category).label;
     </ol>
   </div>
 </Base>
+
+<style>
+  h1 i {
+    color: var(--cat);
+  }
+</style>

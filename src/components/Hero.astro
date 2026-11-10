@@ -9,79 +9,113 @@ interface Props {
 }
 const { postCount, categoryCount, tagCount } = Astro.props;
 const pad = (n: number) => String(n).padStart(2, '0');
+// ID 结尾的数字单独排成斜体：Aqua196 → Aqua + 196
+const [, word = SITE.author, digits = ''] = /^(.*?)(\d+)$/.exec(SITE.author) ?? [];
 ---
 
-<section class="hero container" id="hero">
-  <div class="grid">
-    <div class="text">
-      <p class="label" data-reveal>{SITE.subtitle}</p>
-      <h1 class="name mono" data-reveal style="--delay:.05s">
-        <span data-scramble data-scramble-load>{SITE.author}</span>
-      </h1>
-      <p class="typer mono" data-reveal style="--delay:.1s">
-        <span class="prompt" aria-hidden="true">$</span>
-        <span class="typed" id="typed" data-lines={JSON.stringify(SITE.taglines)}>{SITE.taglines[0]}</span><span
-          class="caret"
-          aria-hidden="true"></span>
-      </p>
-      <p class="lead" data-reveal style="--delay:.15s">{SITE.description}</p>
-      <div class="cta" data-reveal style="--delay:.2s">
-        <a class="btn btn-primary" href="#latest">开始阅读 ↓</a>
-        <a class="btn" href={url('/archive')}>归档</a>
+<section class="hero" id="hero">
+  <div class="dots" aria-hidden="true"></div>
+  <div class="container">
+    <div class="grid">
+      <div class="text">
+        <p class="eyebrow label" data-reveal><i aria-hidden="true"></i>{SITE.subtitle}</p>
+        <h1 class="name" data-reveal style="--delay:.05s">{word}{digits && <em>{digits}</em>}</h1>
+        <p class="lead" data-reveal style="--delay:.1s">{SITE.description}</p>
+        <p class="typer mono" data-reveal style="--delay:.15s">
+          <span class="prompt" aria-hidden="true">$</span>
+          <span class="typed" id="typed" data-lines={JSON.stringify(SITE.taglines)}>{SITE.taglines[0]}</span><span
+            class="caret"
+            aria-hidden="true"></span>
+        </p>
+        <div class="cta" data-reveal style="--delay:.2s">
+          <a class="btn btn-primary" href="#latest">开始阅读 <span class="arr down" aria-hidden="true">↓</span></a>
+          <a class="btn" href={url('/archive')}>全部归档 <span class="arr" aria-hidden="true">→</span></a>
+        </div>
       </div>
+
+      <figure class="art" data-reveal style="--delay:.15s">
+        <canvas id="model" role="img" aria-label="可以拖动旋转的三维曲面"></canvas>
+        <figcaption class="mono">
+          <span class="cap-name">fig. <span id="model-idx">1</span> — <span id="model-name" aria-live="polite">trefoil knot</span></span>
+          <span class="cap-note" id="model-note">crossing number = 3</span>
+          <button type="button" class="cap-next" id="model-next" aria-label="切换到下一个模型">next <span aria-hidden="true">→</span></button>
+        </figcaption>
+      </figure>
     </div>
 
-    <figure class="art" data-reveal style="--delay:.15s">
-      <span class="tick tl" aria-hidden="true"></span>
-      <span class="tick tr" aria-hidden="true"></span>
-      <span class="tick bl" aria-hidden="true"></span>
-      <span class="tick br" aria-hidden="true"></span>
-      <pre id="model" aria-hidden="true"></pre>
-      <figcaption class="mono">
-        <span class="cap-name">fig.1 — <span id="model-name" aria-live="polite">trefoil knot</span></span>
-        <button type="button" class="cap-next" id="model-next" aria-label="切换到下一个模型">
-          <span id="model-idx">01/04</span> next →
-        </button>
-        <span class="cap-note" id="model-note">crossing number = 3</span>
-        <span class="cap-hint">拖动旋转 · 点击切换</span>
-      </figcaption>
-    </figure>
-  </div>
-
-  <div class="stats mono" data-reveal style="--delay:.25s">
-    <a href={url('/archive')}><span class="k">Writeups</span><span class="v" data-count={postCount}>{pad(postCount)}</span></a>
-    <a href={url('/categories')}><span class="k">Categories</span><span class="v" data-count={categoryCount}>{pad(categoryCount)}</span></a>
-    <a href={url('/tags')}><span class="k">Tags</span><span class="v" data-count={tagCount}>{pad(tagCount)}</span></a>
-    <div><span class="k">Since</span><span class="v">{SITE.since.slice(0, 4)}</span></div>
+    <div class="stats" data-reveal style="--delay:.25s">
+      <a href={url('/archive')}><span class="v" data-count={postCount}>{pad(postCount)}</span><span class="k">Writeups</span></a>
+      <a href={url('/categories')}><span class="v" data-count={categoryCount}>{pad(categoryCount)}</span><span class="k">Categories</span></a>
+      <a href={url('/tags')}><span class="v" data-count={tagCount}>{pad(tagCount)}</span><span class="k">Tags</span></a>
+      <div><span class="v">{SITE.since.slice(0, 4)}</span><span class="k">Since</span></div>
+    </div>
   </div>
 </section>
 
 <style>
   .hero {
-    padding-top: 5rem;
-    padding-bottom: 4.5rem;
+    position: relative;
+    padding: 4.5rem 0 0;
+  }
+  /* 背景点阵：只在插图那一侧淡淡地露出来 */
+  .dots {
+    position: absolute;
+    inset: 0 0 6rem;
+    z-index: -1;
+    background-image: radial-gradient(circle, var(--line-2) 1px, transparent 1.4px);
+    background-size: 26px 26px;
+    mask-image: radial-gradient(ellipse 52% 62% at 74% 42%, #000 0%, transparent 100%);
+    -webkit-mask-image: radial-gradient(ellipse 52% 62% at 74% 42%, #000 0%, transparent 100%);
   }
   .grid {
     display: grid;
-    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
-    gap: 4rem;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: 3rem;
     align-items: center;
   }
+  .eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    margin: 0;
+  }
+  .eyebrow i {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-soft);
+  }
   .name {
-    margin: 0.8rem 0 1.4rem;
-    font-size: clamp(3rem, 10.5vw, 7.5rem);
-    font-weight: 800;
-    line-height: 0.92;
-    letter-spacing: -0.065em;
+    margin: 1.4rem 0 1.6rem;
+    font-family: var(--font-display);
+    font-size: clamp(4.4rem, 15.5vw, 10.5rem);
+    font-weight: 400;
+    line-height: 0.86;
+    letter-spacing: -0.03em;
     white-space: nowrap;
+  }
+  .name em {
+    color: var(--accent);
+    letter-spacing: -0.02em;
+    /* 斜体数字和前面的正体字母之间留一点呼吸 */
+    margin-left: 0.05em;
+  }
+  .lead {
+    max-width: 30rem;
+    margin: 0;
+    font-size: clamp(1.05rem, 1.6vw, 1.2rem);
+    color: var(--fg-2);
+    text-wrap: pretty;
   }
   /* 单行 + 省略号：标语长短不一，不能让它换行把下面的内容顶上顶下 */
   .typer {
     display: flex;
     align-items: center;
-    margin: 0;
+    margin: 1.1rem 0 0;
     height: 1.8em;
-    font-size: clamp(0.85rem, 2vw, 1.1rem);
+    font-size: 0.88rem;
+    color: var(--muted);
     white-space: nowrap;
   }
   .typed {
@@ -94,162 +128,128 @@ const pad = (n: number) => String(n).padStart(2, '0');
   }
   .prompt {
     flex: none;
-    color: var(--muted);
-    margin-right: 0.6rem;
-  }
-  .lead {
-    max-width: 460px;
-    margin: 1.4rem 0 2.2rem;
-    color: var(--fg-2);
-    text-wrap: pretty;
+    color: var(--accent);
+    margin-right: 0.7rem;
   }
   .cta {
     display: flex;
     flex-wrap: wrap;
     gap: 0.75rem;
+    margin-top: 2.4rem;
   }
 
-  /* ---------- 图：四角裁切标记，像印刷品上的插图 ---------- */
+  /* ---------- 插图 ---------- */
   .art {
-    position: relative;
     margin: 0;
-    padding: 1.4rem 1.4rem 1rem;
+    min-width: 0;
   }
-  .tick {
-    position: absolute;
-    width: 14px;
-    height: 14px;
-    border-color: var(--fg);
-    border-style: solid;
-    border-width: 0;
-  }
-  .tl {
-    top: 0;
-    left: 0;
-    border-top-width: 1px;
-    border-left-width: 1px;
-  }
-  .tr {
-    top: 0;
-    right: 0;
-    border-top-width: 1px;
-    border-right-width: 1px;
-  }
-  .bl {
-    bottom: 0;
-    left: 0;
-    border-bottom-width: 1px;
-    border-left-width: 1px;
-  }
-  .br {
-    bottom: 0;
-    right: 0;
-    border-bottom-width: 1px;
-    border-right-width: 1px;
-  }
-  pre {
-    margin: 0;
-    font-family: var(--font-mono);
-    font-size: 9px;
-    line-height: 1.1;
-    color: var(--fg);
-    white-space: pre;
-    overflow: hidden;
-    user-select: none;
-    -webkit-user-select: none;
-    text-align: center;
+  canvas {
+    display: block;
+    width: 100%;
+    max-width: 540px;
+    aspect-ratio: 1;
+    margin: 0 auto;
     cursor: grab;
     /* 竖直方向留给页面滚动，水平拖动才交给旋转 */
     touch-action: pan-y;
+    user-select: none;
+    -webkit-user-select: none;
   }
-  pre.dragging {
+  canvas.dragging {
     cursor: grabbing;
   }
   figcaption {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 0.35rem 1rem;
-    margin-top: 1rem;
-    padding-top: 0.6rem;
-    border-top: 1px dashed var(--line-2);
-    font-size: 0.7rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.3rem 1.1rem;
+    max-width: 540px;
+    margin: -0.6rem auto 0;
+    font-size: 0.72rem;
     color: var(--muted);
   }
   .cap-name {
     color: var(--fg-2);
   }
   .cap-next {
-    justify-self: end;
+    margin-left: auto;
     padding: 0;
     border: none;
     background: none;
     color: var(--fg-2);
     font: inherit;
-    font-variant-numeric: tabular-nums;
     cursor: pointer;
+    transition: color 0.2s;
+  }
+  .cap-next span {
+    display: inline-block;
+    transition: transform 0.25s var(--ease);
   }
   .cap-next:hover {
-    color: var(--fg);
-    text-decoration: underline;
-    text-underline-offset: 3px;
+    color: var(--accent);
   }
-  .cap-hint {
-    justify-self: end;
+  .cap-next:hover span {
+    transform: translateX(3px);
   }
 
-  /* ---------- 数字条 ---------- */
+  /* ---------- 数字 ---------- */
   .stats {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     margin: 4.5rem 0 0;
-    border-top: 1px solid var(--fg);
-    border-bottom: 1px solid var(--line);
+    border-top: 1px solid var(--line);
   }
   .stats > * {
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
-    padding: 1rem 1.1rem 1.1rem;
-    border-left: 1px solid var(--line);
-    transition: background 0.12s, color 0.12s;
-  }
-  .stats > :first-child {
-    border-left: none;
-  }
-  .stats a:hover {
-    background: var(--fg);
-    color: var(--bg);
-  }
-  .k {
-    font-size: 0.68rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    opacity: 0.65;
+    gap: 0.3rem;
+    padding: 1.4rem 0 0;
   }
   .v {
-    font-size: clamp(1.6rem, 4vw, 2.4rem);
-    font-weight: 700;
+    font-family: var(--font-display);
+    font-size: clamp(2.4rem, 5vw, 3.4rem);
     line-height: 1;
-    letter-spacing: -0.04em;
     font-variant-numeric: tabular-nums;
+    transition: color 0.2s;
+  }
+  .k {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .stats a:hover .v {
+    color: var(--accent);
   }
 
   @media (max-width: 900px) {
     .hero {
       padding-top: 3rem;
     }
+    .dots {
+      mask-image: radial-gradient(ellipse 80% 40% at 50% 68%, #000 0%, transparent 100%);
+      -webkit-mask-image: radial-gradient(ellipse 80% 40% at 50% 68%, #000 0%, transparent 100%);
+    }
     .grid {
       grid-template-columns: minmax(0, 1fr);
-      gap: 3rem;
+      gap: 2.5rem;
+    }
+    canvas,
+    figcaption {
+      max-width: 420px;
+    }
+    .stats {
+      margin-top: 3.5rem;
+    }
+  }
+  @media (max-width: 520px) {
+    .cap-note {
+      display: none;
     }
     .stats {
       grid-template-columns: repeat(2, 1fr);
-    }
-    .stats > :nth-child(3) {
-      border-left: none;
-    }
-    .stats > :nth-child(n + 3) {
-      border-top: 1px solid var(--line);
+      row-gap: 0.4rem;
     }
   }
 </style>
@@ -261,6 +261,7 @@ const pad = (n: number) => String(n).padStart(2, '0');
   const later = (fn: () => void, ms: number) => timers.push(window.setTimeout(fn, ms));
 
   function typewriter(el: HTMLElement, lines: string[]) {
+    if (lines.length < 2) return;
     let li = 0;
     let ci = lines[0].length;
     let deleting = true;
@@ -294,10 +295,10 @@ const pad = (n: number) => String(n).padStart(2, '0');
     requestAnimationFrame(tick);
   }
 
-  // ---------- ASCII 曲面渲染 ----------
-  // 每个模型是一个参数曲面 f(u, v)，u、v ∈ [0, 1]。预先在 U×V 网格上采样出点和法线，
-  // 每帧旋转 → 透视投影到字符网格 → z-buffer 取最近的点 → 按光照亮度选字符。
-  // 所有模型共用同一套网格，所以切换时可以逐点插值，形状会“变形”过去。
+  // ---------- 点刻曲面渲染 ----------
+  // 每个模型是一个参数曲面 f(u, v)，u、v ∈ [0, 1]。预先在 U×V 网格上（带一点随机抖动）采样出点和法线，
+  // 每帧旋转 → 透视投影 → 用一张粗网格的深度图挡掉背面的点 → 按光照决定每个点的浓淡，直接写进像素。
+  // 所有模型共用同一套采样点，所以切换时可以逐点插值，形状会“变形”过去。
   type Vec = [number, number, number];
   // 约定：模型的对称轴是 y 轴，展示时绕它转（转台），tilt 是默认的俯视角
   type Model = { name: string; note: string; tilt: number; f: (u: number, v: number) => Vec };
@@ -383,8 +384,22 @@ const pad = (n: number) => String(n).padStart(2, '0');
     },
   ];
 
+
   type Geo = { P: Float32Array; Nn: Float32Array };
   const cache = new Map<number, Geo>();
+
+  // 每个采样点在自己的格子里随机挪一下，画出来是均匀的点刻而不是一圈圈整齐的线。
+  // 用固定种子：每次刷新、每个模型的抖动都一样，变形时点和点才能对上。
+  const JU = new Float32Array(N);
+  const JV = new Float32Array(N);
+  {
+    let seed = 196;
+    const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296) - 0.5;
+    for (let i = 0; i < N; i++) {
+      JU[i] = rnd();
+      JV[i] = rnd();
+    }
+  }
 
   // 采样：位置居中并缩放到单位球内（双面光照，法线朝向无所谓）
   function geometry(i: number): Geo {
@@ -392,16 +407,24 @@ const pad = (n: number) => String(n).padStart(2, '0');
     if (hit) return hit;
     const f = MODELS[i].f;
     const P = new Float32Array(N * 3);
+    const Nn = new Float32Array(N * 3);
     const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    // 法线直接在参数空间里取差分，接缝处、几段拼起来的模型也不会算错
+    const e = 1e-5;
     for (let a = 0; a < U; a++) {
       for (let b = 0; b < V; b++) {
-        const p = f((a + 0.5) / U, b / (V - 1));
-        const k = (a * V + b) * 3;
+        const i = a * V + b;
+        const u = (a + 0.5 + JU[i]) / U;
+        // 不夹到 [0, 1]：闭合曲面在 v 方向本来就是周期的，夹住反而会在接缝处堆出一条线
+        const w = (b + JV[i]) / (V - 1);
+        const p = f(u, w);
+        const k = i * 3;
         for (let d = 0; d < 3; d++) {
           P[k + d] = p[d];
           lo[d] = Math.min(lo[d], p[d]);
           hi[d] = Math.max(hi[d], p[d]);
         }
+        Nn.set(unit(cross(sub(f(u + e, w), f(u - e, w)), sub(f(u, w + e), f(u, w - e)))), k);
       }
     }
     const mid = lo.map((l, d) => (l + hi[d]) / 2);
@@ -413,33 +436,24 @@ const pad = (n: number) => String(n).padStart(2, '0');
       R = Math.max(R, Math.hypot(P[k], P[k + 1], P[k + 2]));
     }
     for (let k = 0; k < N * 3; k++) P[k] /= R;
-
-    // 法线直接在参数空间里取差分，接缝处、几段拼起来的模型也不会算错
-    const Nn = new Float32Array(N * 3);
-    const e = 1e-5;
-    for (let a = 0; a < U; a++) {
-      const u = (a + 0.5) / U;
-      for (let b = 0; b < V; b++) {
-        const w = b / (V - 1);
-        const n = unit(cross(sub(f(u + e, w), f(u - e, w)), sub(f(u, w + e), f(u, w - e))));
-        Nn.set(n, (a * V + b) * 3);
-      }
-    }
     const geo = { P, Nn };
     cache.set(i, geo);
     return geo;
   }
 
-  function figure(pre: HTMLElement) {
-    const CHARS = '.,-~:;=!*#$@';
-    const COLS = 80;
-    const ROWS = 42;
-    const K2 = 4;
-    const K1 = COLS * K2 * 0.44; // 单位球内的点投影后刚好不出界
-    const ASPECT = 0.55; // 字符宽 0.6em、行高 1.1em，纵向要压缩才是圆的
+  const hex = (s: string): Vec => {
+    const m = /^#?([0-9a-f]{6})$/i.exec(s.trim());
+    const n = m ? parseInt(m[1], 16) : 0xffffff;
+    return [n >> 16, (n >> 8) & 255, n & 255];
+  };
+
+  function figure(canvas: HTMLCanvasElement) {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return () => {};
+    const K2 = 4; // 相机到原点的距离
     const LIGHT = unit([-0.5, 0.6, -0.65]); // 从观察者左上方打光
-    const IDLE = -0.012; // 每帧自转的弧度
-    const AUTO_NEXT = 15000;
+    const IDLE = -0.0045; // 每帧自转的弧度
+    const AUTO_NEXT = 16000;
 
     const nameEl = document.getElementById('model-name');
     const noteEl = document.getElementById('model-note');
@@ -466,23 +480,72 @@ const pad = (n: number) => String(n).padStart(2, '0');
     P.set(to.P);
     Nn.set(to.Nn);
 
-    const out: string[] = new Array(COLS * ROWS);
-    const zbuf = new Float32Array(COLS * ROWS);
+    // ---------- 画布：按设备像素建一张 ImageData，点直接写进去 ----------
+    let W = 0;
+    let dot = 1; // 一个点占几个设备像素
+    let cell = 4; // 深度图一格的边长（设备像素）
+    let G = 0;
+    let img: ImageData | null = null;
+    let px = new Uint32Array(0);
+    let zbuf = new Float32Array(0);
+    const SX = new Int16Array(N);
+    const SY = new Int16Array(N);
+    const SZ = new Float32Array(N);
+    const little = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
+
+    let AMBIENT = 0.2; // 背光面的最低浓度
+    let ink: Vec = [255, 255, 255];
+    let glow: Vec = [255, 255, 255];
+    const readColors = () => {
+      const cs = getComputedStyle(document.documentElement);
+      ink = hex(cs.getPropertyValue('--fg'));
+      glow = hex(cs.getPropertyValue('--accent'));
+      // 深色底上的点要更亮一些才立得住；浅色底上墨点本身就够重
+      AMBIENT = document.documentElement.dataset.theme === 'light' ? 0.1 : 0.26;
+    };
+
+    const fit = () => {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const w = Math.round(canvas.clientWidth * dpr);
+      if (!w || w === W) return;
+      W = w;
+      canvas.width = canvas.height = W;
+      img = ctx.createImageData(W, W);
+      px = new Uint32Array(img.data.buffer);
+      dot = dpr >= 1.5 ? 2 : 1;
+      cell = Math.max(3, Math.round(W / 150));
+      G = Math.ceil(W / cell);
+      zbuf = new Float32Array(G * G);
+    };
 
     const render = () => {
-      out.fill(' ');
+      if (!img) return;
+      px.fill(0);
       zbuf.fill(0);
+      const K1 = W * K2 * 0.46; // 单位球内的点投影后刚好不出界
+      const half = W / 2;
       const [m0, m1, m2, m3, m4, m5, m6, m7, m8] = matrix();
-      for (let k = 0; k < N * 3; k += 3) {
+
+      // 第一遍：投影，并记下每个格子里离相机最近的深度
+      for (let i = 0, k = 0; i < N; i++, k += 3) {
         const x0 = P[k], y0 = P[k + 1], z0 = P[k + 2];
-        const z = m6 * x0 + m7 * y0 + m8 * z0;
-        const ooz = 1 / (K2 + z);
-        const xp = Math.floor(COLS / 2 + K1 * ooz * (m0 * x0 + m1 * y0 + m2 * z0));
-        const yp = Math.floor(ROWS / 2 - K1 * ASPECT * ooz * (m3 * x0 + m4 * y0 + m5 * z0));
-        if (xp < 0 || xp >= COLS || yp < 0 || yp >= ROWS) continue;
-        const i = xp + yp * COLS;
-        if (ooz <= zbuf[i]) continue;
-        zbuf[i] = ooz;
+        const ooz = 1 / (K2 + m6 * x0 + m7 * y0 + m8 * z0);
+        const x = (half + K1 * ooz * (m0 * x0 + m1 * y0 + m2 * z0)) | 0;
+        const y = (half - K1 * ooz * (m3 * x0 + m4 * y0 + m5 * z0)) | 0;
+        SX[i] = x;
+        SY[i] = y;
+        SZ[i] = ooz;
+        if (x < 0 || y < 0 || x >= W || y >= W) continue;
+        const c = ((x / cell) | 0) + ((y / cell) | 0) * G;
+        if (ooz > zbuf[c]) zbuf[c] = ooz;
+      }
+
+      // 第二遍：只画没被挡住的点
+      const [ir, ig, ib] = ink;
+      const [gr, gg, gb] = glow;
+      for (let i = 0, k = 0; i < N; i++, k += 3) {
+        const x = SX[i], y = SY[i], ooz = SZ[i];
+        if (x < 0 || y < 0 || x > W - dot || y > W - dot) continue;
         const a = Nn[k], b = Nn[k + 1], c = Nn[k + 2];
         let nx = m0 * a + m1 * b + m2 * c;
         let ny = m3 * a + m4 * b + m5 * c;
@@ -493,18 +556,30 @@ const pad = (n: number) => String(n).padStart(2, '0');
           nz = -nz;
         }
         const len = Math.hypot(nx, ny, nz) || 1;
+        // 曲面越是侧对相机，同一格里的深度差越大，容差要跟着放宽，否则边缘会被一格一格地啃掉
+        const cz = -nz / len;
+        const slope = Math.sqrt(Math.max(0, 1 - cz * cz)) / Math.max(0.06, cz);
+        const tol = 0.003 + Math.min(0.03, (cell / K1) * ooz * slope);
+        if (ooz < zbuf[((x / cell) | 0) + ((y / cell) | 0) * G] - tol) continue;
         const L = Math.max(0, (nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2]) / len);
-        out[i] = CHARS[Math.min(CHARS.length - 1, Math.floor(L * L * 0.4 * CHARS.length + L * 0.6 * CHARS.length))];
+        // 近处实、远处虚；暗部带一点主色，亮部回到前景色
+        const depth = 0.55 + 0.45 * Math.min(1, Math.max(0, (ooz - 0.2) * 7.5));
+        const alpha = (AMBIENT + (1 - AMBIENT) * Math.pow(L, 1.4)) * depth;
+        const t = Math.min(1, L * 1.1);
+        const r = gr + (ir - gr) * t, g = gg + (ig - gg) * t, bl = gb + (ib - gb) * t;
+        const A = (alpha * 255) | 0;
+        const color = little ? ((A << 24) | (bl << 16) | (g << 8) | r) >>> 0 : ((r << 24) | (g << 16) | (bl << 8) | A) >>> 0;
+        const o = x + y * W;
+        px[o] = color;
+        if (dot === 2) px[o + 1] = px[o + W] = px[o + W + 1] = color;
       }
-      let s = '';
-      for (let r = 0; r < ROWS; r++) s += out.slice(r * COLS, (r + 1) * COLS).join('') + '\n';
-      pre.textContent = s;
+      ctx.putImageData(img, 0, 0);
     };
 
     const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
     const stepMorph = (dt: number) => {
       if (!from) return;
-      morph = Math.min(1, morph + dt / 75);
+      morph = Math.min(1, morph + dt / 80);
       const e = ease(morph);
       tiltBase = tiltFrom + (MODELS[current].tilt - tiltFrom) * e;
       const fP = from.P, tP = to.P, fN = from.Nn, tN = to.Nn;
@@ -521,7 +596,7 @@ const pad = (n: number) => String(n).padStart(2, '0');
       const m = MODELS[current];
       if (nameEl) nameEl.textContent = m.name;
       if (noteEl) noteEl.textContent = m.note;
-      if (idxEl) idxEl.textContent = `${String(current + 1).padStart(2, '0')}/${String(MODELS.length).padStart(2, '0')}`;
+      if (idxEl) idxEl.textContent = String(current + 1);
       // 从“当前画面”出发变形，切换途中再点也是连续的
       from = { P: P.slice(), Nn: Nn.slice() };
       tiltFrom = tiltBase;
@@ -537,13 +612,13 @@ const pad = (n: number) => String(n).padStart(2, '0');
     // ---------- 拖动：水平拨动转台（带惯性），竖直调俯仰（松手回弹）；点一下换模型 ----------
     let v = IDLE;
     let drag: { x: number; y: number; moved: number } | null = null;
-    const perPx = () => Math.PI / Math.max(240, pre.clientWidth);
+    const perPx = () => Math.PI / Math.max(240, canvas.clientWidth);
 
     const onDown = (e: PointerEvent) => {
       if (e.button !== 0) return;
       drag = { x: e.clientX, y: e.clientY, moved: 0 };
-      pre.setPointerCapture(e.pointerId);
-      pre.classList.add('dragging');
+      canvas.setPointerCapture(e.pointerId);
+      canvas.classList.add('dragging');
       v = 0;
       lastInteraction = performance.now();
     };
@@ -564,13 +639,9 @@ const pad = (n: number) => String(n).padStart(2, '0');
       if (!drag) return;
       const click = e.type === 'pointerup' && drag.moved < 6;
       drag = null;
-      pre.classList.remove('dragging');
+      canvas.classList.remove('dragging');
       v = Math.max(-0.25, Math.min(0.25, v));
       if (click) next();
-    };
-
-    const fit = () => {
-      pre.style.fontSize = `${Math.max(6, pre.clientWidth / (COLS * 0.6))}px`;
     };
 
     let raf = 0;
@@ -594,14 +665,18 @@ const pad = (n: number) => String(n).padStart(2, '0');
     };
     const start = () => {
       cancelAnimationFrame(raf);
-      if (visible && !document.hidden) {
+      if (!reduce && visible && !document.hidden) {
         last = performance.now();
         raf = requestAnimationFrame(loop);
       }
     };
+    const redraw = () => {
+      fit();
+      readColors();
+      render();
+    };
 
-    fit();
-    render();
+    redraw();
     // 其余模型趁空闲时预先算好，切换时就不会卡一下
     let alive = true;
     const idle = (cb: () => void) => ('requestIdleCallback' in window ? requestIdleCallback(cb) : setTimeout(cb, 300));
@@ -611,38 +686,36 @@ const pad = (n: number) => String(n).padStart(2, '0');
       idle(() => warm(i + 1));
     };
     idle(() => warm(1));
-    pre.addEventListener('pointerdown', onDown);
-    pre.addEventListener('pointermove', onMove);
-    pre.addEventListener('pointerup', onUp);
-    pre.addEventListener('pointercancel', onUp);
+    canvas.addEventListener('pointerdown', onDown);
+    canvas.addEventListener('pointermove', onMove);
+    canvas.addEventListener('pointerup', onUp);
+    canvas.addEventListener('pointercancel', onUp);
     nextBtn?.addEventListener('click', next);
-    window.addEventListener('resize', fit);
-    if (reduce) {
-      return () => {
-        alive = false;
-        window.removeEventListener('resize', fit);
-      };
-    }
+    window.addEventListener('resize', redraw);
+    // 切换明暗主题后重新取色
+    const themeWatch = new MutationObserver(redraw);
+    themeWatch.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
     const io = new IntersectionObserver(([entry]) => {
       visible = entry.isIntersecting;
       start();
     });
-    io.observe(pre);
+    io.observe(canvas);
     document.addEventListener('visibilitychange', start);
 
     return () => {
       alive = false;
       cancelAnimationFrame(raf);
       io.disconnect();
-      window.removeEventListener('resize', fit);
+      themeWatch.disconnect();
+      window.removeEventListener('resize', redraw);
       document.removeEventListener('visibilitychange', start);
     };
   }
 
   function init() {
-    const pre = document.getElementById('model');
-    if (pre) stopFigure = figure(pre);
+    const canvas = document.getElementById('model') as HTMLCanvasElement | null;
+    if (canvas) stopFigure = figure(canvas);
     const typed = document.getElementById('typed');
     if (!typed || reduce) return;
     typewriter(typed, JSON.parse(typed.dataset.lines || '[]'));

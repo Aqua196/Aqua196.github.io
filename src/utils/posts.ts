@@ -45,8 +45,12 @@ export function tagGroups(posts: Post[]) {
     .sort((a, b) => b.posts.length - a.posts.length || a.name.localeCompare(b.name));
 }
 
+/** 分类的显示名和代表色相；没在 config 里登记的分类，按名字算一个固定的色相 */
 export function categoryMeta(key: string) {
-  return CATEGORIES[key] ?? { label: key };
+  const c = CATEGORIES[key];
+  let hash = 0;
+  for (const ch of key) hash = (hash * 31 + ch.codePointAt(0)!) % 360;
+  return { label: c?.label ?? key, hue: c?.hue ?? hash };
 }
 
 /** 粗略阅读时间：中文 400 字/分钟，英文 200 词/分钟，代码按英文算 */

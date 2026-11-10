@@ -11,8 +11,8 @@ const cats = countBy(posts, (p) => p.data.category);
 <Base title="分类" description="按方向浏览 writeup">
   <div class="container">
     <header class="page-head">
-      <div class="eyebrow" data-reveal>$ ls ./categories</div>
-      <h1 data-reveal style="--delay:.05s"><span data-scramble data-scramble-load>Categories</span></h1>
+      <div class="eyebrow" data-reveal>ls ./categories</div>
+      <h1 data-reveal style="--delay:.05s">Categories</h1>
       <p data-reveal style="--delay:.1s">{cats.length} 个方向。</p>
     </header>
 
@@ -21,11 +21,13 @@ const cats = countBy(posts, (p) => p.data.category);
       {
         cats.map(([key, n]) => {
           const recent = posts.filter((p) => p.data.category === key).slice(0, 3);
+          const cat = categoryMeta(key);
           return (
-            <section class="cat">
+            <section class="cat" data-tone style={`--h:${cat.hue}`}>
               <a class="head" href={categoryUrl(key)}>
-                <h2 class="mono">{categoryMeta(key).label}</h2>
-                <span class="n mono">{String(n).padStart(2, '0')}</span>
+                <span class="chip">{String(n).padStart(2, '0')} posts</span>
+                <h2>{cat.label}</h2>
+                <span class="go" aria-hidden="true">→</span>
               </a>
               <ul>
                 {recent.map((p) => (
@@ -34,6 +36,11 @@ const cats = countBy(posts, (p) => p.data.category);
                   </li>
                 ))}
               </ul>
+              {n > recent.length && (
+                <a class="more-link" href={categoryUrl(key)}>
+                  还有 {n - recent.length} 篇
+                </a>
+              )}
             </section>
           );
         })
@@ -48,56 +55,88 @@ const cats = countBy(posts, (p) => p.data.category);
   }
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
-    border-top: 1px solid var(--fg);
-    border-left: 1px solid var(--line);
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+    gap: 1rem;
   }
   .cat {
-    border-right: 1px solid var(--line);
-    border-bottom: 1px solid var(--line);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem 1.5rem 1.3rem;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: border-color 0.25s;
+  }
+  /* 右上角一抹分类色 */
+  .cat::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(70% 60% at 100% 0%, color-mix(in oklch, var(--cat) 12%, transparent), transparent 70%);
+    pointer-events: none;
+  }
+  .cat:hover {
+    border-color: var(--cat-line);
   }
   .head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    padding: 1.2rem 1.2rem 1rem;
-    transition: background 0.12s, color 0.12s;
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    gap: 0.2rem 1rem;
+    margin-bottom: 1.2rem;
   }
-  .head:hover {
-    background: var(--fg);
-    color: var(--bg);
+  .head .chip {
+    grid-column: 1 / -1;
+    margin-bottom: 1.4rem;
   }
   h2 {
     margin: 0;
-    font-size: 1rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-  .n {
-    font-size: 2.2rem;
-    font-weight: 800;
+    font-family: var(--font-display);
+    font-size: 2.4rem;
+    font-weight: 400;
     line-height: 1;
-    letter-spacing: -0.05em;
+    transition: color 0.2s;
+  }
+  .head:hover h2 {
+    color: var(--cat);
+  }
+  .go {
+    color: var(--cat);
+    opacity: 0;
+    transform: translateX(-8px);
+    transition: opacity 0.2s, transform 0.3s var(--ease);
+  }
+  .head:hover .go {
+    opacity: 1;
+    transform: none;
   }
   ul {
+    position: relative;
+    flex: 1;
     list-style: none;
     margin: 0;
-    padding: 0 1.2rem 1.1rem;
+    padding: 0;
   }
   li {
-    padding: 0.4rem 0;
+    padding: 0.6rem 0;
     border-top: 1px solid var(--line);
-    font-size: 0.88rem;
+    font-size: 0.9rem;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
   li a {
     color: var(--fg-2);
+    transition: color 0.2s;
   }
   li a:hover {
     color: var(--fg);
-    text-decoration: underline;
-    text-underline-offset: 3px;
+  }
+  .more-link {
+    position: relative;
+    margin-top: 0.8rem;
   }
 </style>

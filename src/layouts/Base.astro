@@ -1,5 +1,8 @@
 ---
 import { ClientRouter } from 'astro:transitions';
+import '@fontsource/instrument-serif/400.css';
+import '@fontsource/instrument-serif/400-italic.css';
+import '@fontsource-variable/instrument-sans';
 import '@fontsource-variable/jetbrains-mono';
 import '../styles/global.css';
 import { SITE } from '../config';
@@ -36,7 +39,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <link rel="icon" type="image/svg+xml" href={url('/favicon.svg')} />
     <link rel="alternate" type="application/rss+xml" title={SITE.title} href={url('/rss.xml')} />
     <link rel="sitemap" href={url('/sitemap-index.xml')} />
-    <meta name="theme-color" content="#0a0a0a" />
+    <meta name="theme-color" content="#0a0c0f" />
     <meta property="og:type" content={type} />
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
@@ -67,7 +70,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
         // 浏览器地址栏颜色跟着当前主题走（包括手动切换的情况）
         function syncThemeColor() {
           var meta = document.querySelector('meta[name="theme-color"]');
-          if (meta) meta.setAttribute('content', root.dataset.theme === 'light' ? '#fafaf8' : '#0a0a0a');
+          if (meta) meta.setAttribute('content', root.dataset.theme === 'light' ? '#f7f7f3' : '#0a0c0f');
         }
         apply();
         if (!window.__themeHooked) {

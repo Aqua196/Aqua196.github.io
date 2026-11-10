@@ -11,6 +11,7 @@ export async function GET() {
       description: p.data.description,
       category: p.data.category,
       categoryLabel: c.label,
+      hue: c.hue,
       tags: p.data.tags,
       event: p.data.event ?? '',
       date: formatDate(p.data.date),

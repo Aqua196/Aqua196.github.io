@@ -15,8 +15,8 @@ for (const p of posts) {
 <Base title="归档" description="所有 writeup 的时间线">
   <div class="container">
     <header class="page-head">
-      <div class="eyebrow" data-reveal>$ git log --oneline</div>
-      <h1 data-reveal style="--delay:.05s"><span data-scramble data-scramble-load>Archive</span></h1>
+      <div class="eyebrow" data-reveal>git log --oneline</div>
+      <h1 data-reveal style="--delay:.05s">Archive</h1>
       <p data-reveal style="--delay:.1s">共 {posts.length} 篇，按时间倒序。</p>
     </header>
 
@@ -24,20 +24,25 @@ for (const p of posts) {
     {
       [...byYear].map(([year, list]) => (
         <section class="year">
-          <h2 class="y mono" data-reveal>
+          <h2 class="y" data-reveal>
             {year}
-            <small>{String(list.length).padStart(2, '0')} posts</small>
+            <small class="mono">{String(list.length).padStart(2, '0')} posts</small>
           </h2>
           <ol>
-            {list.map((p, i) => (
-              <li data-reveal style={`--delay:${Math.min(i, 10) * 0.03}s`}>
-                <a href={postUrl(p.id)}>
-                  <time class="mono">{formatDate(p.data.date).slice(5)}</time>
-                  <span class="t">{p.data.title}</span>
-                  <span class="c mono">{categoryMeta(p.data.category).label}</span>
-                </a>
-              </li>
-            ))}
+            {list.map((p, i) => {
+              const cat = categoryMeta(p.data.category);
+              return (
+                <li data-reveal data-tone style={`--h:${cat.hue};--delay:${Math.min(i, 10) * 0.03}s`}>
+                  <a href={postUrl(p.id)}>
+                    <time class="mono" datetime={p.data.date.toISOString()}>
+                      {formatDate(p.data.date).slice(5)}
+                    </time>
+                    <span class="t">{p.data.title}</span>
+                    <span class="chip">{cat.label}</span>
+                  </a>
+                </li>
+              );
+            })}
           </ol>
         </section>
       ))
@@ -48,25 +53,29 @@ for (const p of posts) {
 <style>
   .year {
     display: grid;
-    grid-template-columns: 10rem minmax(0, 1fr);
-    gap: 1rem;
-    padding-top: 1rem;
-    margin-bottom: 3rem;
-    border-top: 1px solid var(--fg);
+    grid-template-columns: 11rem minmax(0, 1fr);
+    gap: 1rem 2rem;
+    padding-top: 1.6rem;
+    margin-bottom: 3.5rem;
+    border-top: 1px solid var(--line);
   }
   .y {
+    position: sticky;
+    top: calc(var(--header-h) + 1.5rem);
+    align-self: start;
     margin: 0;
-    font-size: 2.6rem;
-    font-weight: 800;
-    line-height: 1;
-    letter-spacing: -0.05em;
+    font-family: var(--font-display);
+    font-size: 4rem;
+    font-weight: 400;
+    line-height: 0.9;
+    letter-spacing: -0.02em;
   }
   .y small {
     display: block;
-    margin-top: 0.6rem;
+    margin-top: 0.9rem;
     font-size: 0.7rem;
-    font-weight: 400;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
     color: var(--muted);
   }
   ol {
@@ -74,40 +83,57 @@ for (const p of posts) {
     margin: 0;
     padding: 0;
   }
+  li + li {
+    border-top: 1px solid var(--line);
+  }
   li a {
     display: grid;
     grid-template-columns: 3.5rem minmax(0, 1fr) auto;
-    gap: 1rem;
+    gap: 1.2rem;
     align-items: baseline;
-    padding: 0.7rem 0.6rem;
-    margin: 0 -0.6rem;
-    border-bottom: 1px solid var(--line);
-    transition: background 0.12s, color 0.12s;
+    padding: 0.95rem 1rem;
+    margin: 0 -1rem;
+    border-radius: var(--radius-sm);
+    transition: background 0.2s;
   }
   li a:hover {
-    background: var(--fg);
-    color: var(--bg);
+    background: var(--bg-2);
   }
-  time,
-  .c {
+  time {
     font-size: 0.75rem;
     color: var(--muted);
-  }
-  .c {
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-  li a:hover time,
-  li a:hover .c {
-    color: inherit;
-    opacity: 0.7;
+    font-variant-numeric: tabular-nums;
   }
   .t {
     font-weight: 550;
+    line-height: 1.5;
+    transition: color 0.2s;
+  }
+  li a:hover .t {
+    color: var(--cat);
   }
   @media (max-width: 720px) {
     .year {
       grid-template-columns: 1fr;
+    }
+    .y {
+      position: static;
+      display: flex;
+      align-items: baseline;
+      gap: 1rem;
+      font-size: 3rem;
+    }
+    .y small {
+      margin: 0;
+    }
+    li a {
+      grid-template-columns: 3rem minmax(0, 1fr);
+      gap: 0.3rem 0.8rem;
+      padding: 0.9rem 0.6rem;
+      margin: 0 -0.6rem;
+    }
+    li .chip {
+      grid-column: 2;
     }
   }
 </style>

@@ -5,34 +5,56 @@ import { url } from '../utils/url';
 
 <Base title="404" noindex>
   <div class="container wrap">
-    <h1 class="mono"><span data-scramble data-scramble-load>404</span></h1>
-    <pre class="term mono">$ curl <span id="missing-path">this-page</span>
-Segmentation fault (core dumped)
+    <p class="label">Error · Not Found</p>
+    <h1>4<em>0</em>4</h1>
+    <pre class="term mono"><span class="ps">$</span> curl <span id="missing-path">this-page</span>
+<span class="err">Segmentation fault (core dumped)</span>
 
-[!] 页面不存在，或者已经被 free 掉了。</pre>
-    <a class="btn btn-primary" href={url('/')}>cd ~</a>
+页面不存在，或者已经被 free 掉了。</pre>
+    <div class="cta">
+      <a class="btn btn-primary" href={url('/')}>回到首页 <span class="arr" aria-hidden="true">→</span></a>
+      <button class="btn" type="button" data-open-search>搜索文章</button>
+    </div>
   </div>
 </Base>
 
 <style>
   .wrap {
-    padding-top: 12vh;
+    padding-top: 10vh;
   }
   h1 {
-    margin: 0;
-    font-size: clamp(6rem, 26vw, 14rem);
-    font-weight: 800;
-    line-height: 0.9;
-    letter-spacing: -0.07em;
+    margin: 1rem 0 0;
+    font-family: var(--font-display);
+    font-size: clamp(8rem, 30vw, 17rem);
+    font-weight: 400;
+    line-height: 0.85;
+    letter-spacing: -0.03em;
+  }
+  h1 em {
+    color: var(--accent);
   }
   .term {
-    margin: 2rem 0;
-    padding: 1rem 0;
-    border-top: 1px solid var(--fg);
-    border-bottom: 1px solid var(--line);
+    max-width: 34rem;
+    margin: 2.5rem 0 2rem;
+    padding: 1.1rem 1.3rem;
     font-size: 0.85rem;
     color: var(--fg-2);
     white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+  .ps {
+    color: var(--accent);
+  }
+  .err {
+    color: oklch(var(--tone-l) var(--tone-c) 25);
+  }
+  .cta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
   }
 </style>
 

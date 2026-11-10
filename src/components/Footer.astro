@@ -1,5 +1,5 @@
 ---
-import { SITE, SOCIALS } from '../config';
+import { NAV, SITE, SOCIALS } from '../config';
 import { url } from '../utils/url';
 import Socials from './Socials.astro';
 
@@ -7,48 +7,113 @@ const year = new Date().getFullYear();
 ---
 
 <footer class="site-footer">
-  <div class="container inner mono">
-    <div class="left">
-      <span>© {year} {SITE.author}</span>
-      <span class="dim">uptime <span id="uptime" data-since={SITE.since}>--</span></span>
+  <div class="container">
+    <div class="top">
+      <div class="brand">
+        <p class="name">{SITE.author}</p>
+        <p class="desc">{SITE.description}</p>
+      </div>
+      <nav class="cols" aria-label="页脚导航">
+        <ul>
+          {NAV.map((item) => <li><a href={url(item.href)}>{item.label}</a></li>)}
+        </ul>
+        <ul>
+          <Socials socials={SOCIALS} />
+          <li><a href={url('/rss.xml')}>RSS</a></li>
+        </ul>
+      </nav>
     </div>
-    <div class="right">
-      <Socials socials={SOCIALS} />
-      <a href={url('/rss.xml')}>RSS</a>
-      <span class="dim">
-        built with <a href="https://astro.build" target="_blank" rel="noopener">Astro</a>
-      </span>
+    <div class="bottom mono">
+      <span>© {year} {SITE.author}</span>
+      <span class="up"><i aria-hidden="true"></i>uptime <span id="uptime" data-since={SITE.since}>--</span></span>
+      <span class="built">built with <a href="https://astro.build" target="_blank" rel="noopener">Astro</a></span>
     </div>
   </div>
 </footer>
 
 <style>
   .site-footer {
-    margin-top: 7rem;
+    margin-top: 8rem;
     border-top: 1px solid var(--line);
+    background: var(--bg-2);
   }
-  .inner {
+  .top {
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
-    gap: 0.8rem 2rem;
-    padding-top: 1.5rem;
-    padding-bottom: 2rem;
-    font-size: 0.75rem;
+    gap: 2.5rem 4rem;
+    padding: 3.5rem 0 3rem;
   }
-  .left,
-  .right {
+  .name {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 2.6rem;
+    line-height: 1;
+  }
+  .desc {
+    margin: 0.9rem 0 0;
+    max-width: 22rem;
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+  .cols {
+    display: flex;
+    gap: 4rem;
+  }
+  ul {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(3, auto);
+    align-content: start;
+    gap: 0.55rem 3rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 0.9rem;
+  }
+  ul :global(a) {
+    color: var(--fg-2);
+    transition: color 0.2s;
+  }
+  ul :global(a:hover) {
+    color: var(--accent);
+  }
+  .bottom {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem 1.2rem;
-  }
-  .dim {
+    gap: 0.5rem 1.6rem;
+    padding: 1.2rem 0 1.6rem;
+    border-top: 1px solid var(--line);
+    font-size: 0.72rem;
     color: var(--muted);
   }
-  a:hover {
-    text-decoration: underline;
-    text-underline-offset: 3px;
+  .up {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    font-variant-numeric: tabular-nums;
+  }
+  .up i {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .built {
+    margin-left: auto;
+  }
+  .built a {
+    color: var(--fg-2);
+  }
+  .built a:hover {
+    color: var(--accent);
+  }
+  @media (max-width: 560px) {
+    .built {
+      margin-left: 0;
+    }
   }
 </style>
 
