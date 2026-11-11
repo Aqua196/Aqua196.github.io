@@ -101,6 +101,7 @@ uniform vec3 uRayO;
 uniform vec3 uRayD;
 uniform float uPush;
 uniform float uBurst;   // 点击的一瞬间从射线处炸开的冲击波
+uniform float uCalm;    // 画得很大时（比如整屏的字）把浮动压小，免得笔画发虚
 out vec3 oPos;
 out vec3 oVel;
 
@@ -129,7 +130,7 @@ void main() {
 
   float busy = sin(m * 3.14159265);
   vec3 acc = (target - aPos) * 46.0;
-  acc += flow(aPos * 1.6 + aSeed.z, uTime * 0.6) * (0.5 + 10.0 * busy + 4.0 * uScatter);
+  acc += flow(aPos * 1.6 + aSeed.z, uTime * 0.6) * (0.5 * uCalm + 10.0 * busy + 4.0 * uScatter);
 
   // 鼠标：离射线越近推得越狠，同时绕着射线打旋
   vec3 rel = aPos - uRayO;
@@ -164,6 +165,8 @@ out float vAlpha;
 out float vLit;
 out float vHue;
 out float vEnergy;
+out float vAccent;
+out float vPaper;
 
 void main() {
   // 相机在 z = -uCam 处朝 +z 看；中心偏移乘了 w，所以雕塑挪到画面一侧也不会被透视拉歪
@@ -177,7 +180,11 @@ void main() {
 
   float delay = aSeed.z * 0.55;
   float m = smoothstep(delay, delay + 0.45, uMix);
-  vec3 n = uRot * normalize(mix(aNA, aNB, m) + 1e-5);
+  // 法线长度是标记：0.5 = 用主色的强调文字，2 = 用前景色的普通文字，1 = 曲面
+  float la = length(aNA), lb = length(aNB);
+  vAccent = mix(step(la, 0.75), step(lb, 0.75), m);
+  vPaper = mix(step(1.5, la), step(1.5, lb), m);
+  vec3 n = uRot * normalize(mix(normalize(aNA + 1e-5), normalize(aNB + 1e-5), m) + 1e-5);
   if (n.z > 0.0) n = -n; // 双面光照
   float lit = max(dot(n, uLight), 0.0);
   float depth = 0.5 + 0.5 * smoothstep(1.0, -1.0, aPos.z);
@@ -208,6 +215,8 @@ in float vAlpha;
 in float vLit;
 in float vHue;
 in float vEnergy;
+in float vAccent;
+in float vPaper;
 uniform vec3 uInk;
 uniform vec3 uGlow;
 uniform vec3 uTint;
@@ -222,13 +231,16 @@ void main() {
   vec3 base = mix(uGlow, uTint, vHue * vHue * 0.7);
   if (uHalo > 0.5) {
     float h = max(0.0, 1.0 - r2 * 4.0);
-    float a = h * h * vAlpha * uGain * (1.0 + 1.5 * vEnergy);
-    o = vec4(base * a, a);
+    float a = h * h * vAlpha * uGain;
+    vec3 hc = mix(mix(base, uInk, vPaper * 0.5), uGlow, vAccent);
+    o = vec4(hc * a, a);
     return;
   }
   float a = min(1.0, smoothstep(0.25, 0.03, r2) * vAlpha * uGain * (1.0 + 1.2 * vEnergy));
   vec3 c = mix(base, uInk, smoothstep(0.25, 0.95, vLit));
-  c = mix(c, uHot, vEnergy * 0.75);
+  // 文字不看光照决定颜色：普通段落是前景色，强调段落是主色（光照只影响浓淡）
+  c = mix(mix(c, uInk, vPaper), uGlow, vAccent);
+  c = mix(c, uHot, vEnergy * 0.75 * (1.0 - vAccent));
   o = vec4(c * a, a); // 预乘 alpha
 }`;
 
@@ -245,16 +257,28 @@ export interface Layout {
   r: number;
 }
 
+/** 一段文字：可以单独设成斜体、单独用主色 */
+export type Run = { text: string; italic?: boolean; accent?: boolean };
+
 /**
- * 粒子要拼成的目标：一个参数曲面（surfaces.ts 里的序号），或者一行文字。
+ * 粒子要拼成的目标：一个参数曲面（surfaces.ts 里的序号），或者几行文字（每行由若干段组成）。
  * flat = 只有正面能看的形状（文字），不做转台自转，只左右轻轻摆动。
  */
-export type Target = { tilt: number; flat?: boolean } & ({ surface: number } | { text: string; italic?: boolean });
+export type Target = {
+  tilt: number;
+  flat?: boolean;
+  /** flat 目标左右摆动的幅度（弧度），默认 0.32。画得很宽的字要小一点，不然会被透视拉歪 */
+  sway?: number;
+} & ({ surface: number } | { lines: Run[][] });
 
 export interface ParticleOptions {
   count: number;
   /** 不传就是全部曲面轮播 */
   targets?: Target[];
+  /** 隔一阵自动换下一个目标（默认开）。由滚动驱动时关掉 */
+  auto?: boolean;
+  /** 点击切换到下一个目标（默认开）。关掉后点击只触发冲击波 */
+  clickNext?: boolean;
   /** false = 不做自适应降画质（调试 / 截图用） */
   adaptive?: boolean;
   layout: () => Layout;
@@ -264,6 +288,8 @@ export interface ParticleOptions {
 
 export interface Sculpture {
   next(): void;
+  /** 形变到第 i 个目标 */
+  goto(i: number): void;
   refresh(): void;
   setScroll(p: number): void;
   destroy(): void;
@@ -278,31 +304,43 @@ const MORPH_SECONDS = 2.4;
 const TAU = Math.PI * 2;
 
 /**
- * 把一行文字变成 n 个粒子的目标：[位置, 法线] × n。
+ * 把几行文字变成 n 个粒子的目标：[位置, 法线] × n，外加它在单位坐标里占的面积（用来决定粒子画多大）。
  * 字画在离屏 canvas 上，从有墨的像素里均匀抽样；再用一份模糊过的副本求梯度当法线，
  * 笔画边缘的法线会向外倒，打上光就有了浮雕的立体感。只在准备阶段跑一次，不占每帧的开销。
+ * 法线的长度被借来当标记（着色器里归一化之前先读它）：2 = 普通文字，用前景色；0.5 = 强调段落，用主色。
+ * 曲面的法线长度是 1，颜色由光照决定。
  */
-async function rasterize(text: string, italic: boolean, n: number): Promise<Float32Array | null> {
-  const font = (px: number) => `${italic ? 'italic ' : ''}400 ${px}px "Instrument Serif", "Songti SC", "Noto Serif SC", serif`;
+async function rasterize(lines: Run[][], n: number): Promise<{ data: Float32Array; area: number } | null> {
+  const font = (run: Run, px: number) => `${run.italic ? 'italic ' : ''}400 ${px}px "Instrument Serif", "Songti SC", "Noto Serif SC", serif`;
   try {
-    await document.fonts.load(font(200), text);
+    await Promise.all(lines.flat().map((r) => document.fonts.load(font(r, 200), r.text)));
   } catch {}
-  const W = 1024, H = 512, PAD = 48;
+  const W = 1600, H = 640, PAD = 64, LEADING = 0.86;
   const sharpCanvas = document.createElement('canvas');
   sharpCanvas.width = W;
   sharpCanvas.height = H;
   const ctx = sharpCanvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) return null;
-  const box = (px: number) => {
-    ctx.font = font(px);
-    const m = ctx.measureText(text);
-    return { l: m.actualBoundingBoxLeft, r: m.actualBoundingBoxRight, a: m.actualBoundingBoxAscent, d: m.actualBoundingBoxDescent };
-  };
-  const first = box(300);
-  const px = 300 * Math.min((W - PAD * 2) / (first.l + first.r), (H - PAD * 2) / (first.a + first.d));
-  const m = box(px);
-  ctx.fillStyle = '#fff';
-  ctx.fillText(text, (W - (m.l + m.r)) / 2 + m.l, (H + m.a - m.d) / 2);
+  const advance = (line: Run[], px: number) =>
+    line.reduce((w, r) => {
+      ctx.font = font(r, px);
+      return w + ctx.measureText(r.text).width;
+    }, 0);
+  // 先按 100px 量一遍，再放大到刚好塞进画布
+  const widest = Math.max(...lines.map((l) => advance(l, 100)));
+  const px = 100 * Math.min((W - PAD * 2) / widest, (H - PAD * 2) / (100 * LEADING * lines.length + 20));
+  ctx.textBaseline = 'alphabetic';
+  lines.forEach((line, i) => {
+    let x = (W - advance(line, px)) / 2;
+    const y = H / 2 + px * LEADING * (i - (lines.length - 1) / 2) + px * 0.33;
+    for (const r of line) {
+      ctx.font = font(r, px);
+      // 红色通道当标记：需要用主色的段落画成 (0, 255, 255)
+      ctx.fillStyle = r.accent ? '#0ff' : '#fff';
+      ctx.fillText(r.text, x, y);
+      x += ctx.measureText(r.text).width;
+    }
+  });
   const sharp = ctx.getImageData(0, 0, W, H).data;
 
   const softCanvas = document.createElement('canvas');
@@ -330,7 +368,7 @@ async function rasterize(text: string, italic: boolean, n: number): Promise<Floa
   const scale = 0.97 / Math.max((x1 - x0) / 2, (y1 - y0) / 2);
   const alpha = (x: number, y: number) => soft[(Math.max(0, Math.min(H - 1, y)) * W + Math.max(0, Math.min(W - 1, x))) * 4 + 3] / 255;
 
-  const out = new Float32Array(n * 6);
+  const data = new Float32Array(n * 6);
   let s = 404;
   const rnd = () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
   for (let i = 0; i < n; i++) {
@@ -339,17 +377,17 @@ async function rasterize(text: string, italic: boolean, n: number): Promise<Floa
     const x = k % W, y = (k / W) | 0;
     const gx = alpha(x + 2, y) - alpha(x - 2, y), gy = alpha(x, y + 2) - alpha(x, y - 2);
     const nx = -gx * 3, ny = gy * 3, nz = -1;
-    const l = Math.hypot(nx, ny, nz);
+    const l = Math.hypot(nx, ny, nz) * (sharp[k * 4] < 128 ? 2 : 0.5);
     const o = i * 6;
-    out[o] = (x + rnd() - cx) * scale;
-    out[o + 1] = -(y + rnd() - cy) * scale;
+    data[o] = (x + rnd() - cx) * scale;
+    data[o + 1] = -(y + rnd() - cy) * scale;
     // 有一点厚度，笔画中间略微鼓向镜头
-    out[o + 2] = (rnd() - 0.5) * 0.1 - alpha(x, y) * 0.07;
-    out[o + 3] = nx / l;
-    out[o + 4] = ny / l;
-    out[o + 5] = nz / l;
+    data[o + 2] = (rnd() - 0.5) * 0.06 - alpha(x, y) * 0.05;
+    data[o + 3] = nx / l;
+    data[o + 4] = ny / l;
+    data[o + 5] = nz / l;
   }
-  return out;
+  return { data, area: filled.length * scale * scale };
 }
 
 const hex = (s: string): Vec => {
@@ -375,6 +413,8 @@ export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions
   const norm = (i: number) => norms.get(i) ?? norms.set(i, bounds(MODELS[i].f)).get(i)!;
   // 文字目标要等字体加载、离屏绘制完才有数据；在那之前先让粒子保持一团散开的云
   const textData: (Float32Array | null)[] = targets.map(() => null);
+  // 每个目标在单位坐标里的表面积：曲面大约是 3，文字小得多。粒子的大小按“面积 / 粒子数”来定
+  const areas: number[] = targets.map(() => 3);
   const ready = (i: number) => 'surface' in targets[i] || !!textData[i];
 
   // ---------- 资源 ----------
@@ -430,7 +470,7 @@ export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions
     if (r.baked[i]) return r.baked[i]!;
     const t = targets[i];
     const buf = gl.createBuffer()!;
-    if ('text' in t) {
+    if ('lines' in t) {
       const data = textData[i];
       if (!data) return r.cloud;
       gl.bindBuffer(gl.ARRAY_BUFFER, buf);
@@ -592,6 +632,8 @@ export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions
     }
     layout = opts.layout();
   };
+  // 布局每帧都问一次调用方（调用方自己保证便宜）：雕塑可以在画面里平滑地挪位置、变大小
+  const place = () => (layout = opts.layout());
   const colors = () => {
     const cs = getComputedStyle(document.documentElement);
     ink = hex(cs.getPropertyValue('--fg'));
@@ -621,6 +663,7 @@ export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions
     gl.uniform3f(u.uRayD, ray.dx, ray.dy, ray.dz);
     gl.uniform1f(u.uPush, push);
     gl.uniform1f(u.uBurst, burst);
+    gl.uniform1f(u.uCalm, Math.max(0.2, Math.min(1, 300 / layout.r)));
     gl.bindVertexArray(r.updateVao[cur]);
     gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, r.tf);
     gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 0, r.state[1 - cur]);
@@ -642,9 +685,15 @@ export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions
     const cx = ((layout.x * dpr) / W) * 2 - 1, cy = 1 - ((layout.y * dpr) / H) * 2;
     const rot = rotation();
     // 粒子之间的平均间距，决定圆点和深度圆片各画多大
-    const gap = R * Math.sqrt(3 / drawCount);
+    const e = morphing ? mix : 0;
+    const area = areas[modelA] + (areas[modelB] - areas[modelA]) * e;
+    const gap = R * Math.sqrt(area / drawCount);
     const size = Math.max(1.2 * dpr, Math.min(3.2 * dpr, gap * 0.95));
     const splat = Math.max(4, Math.min(22, gap * 3.2));
+    // 粒子挤得比一个像素还密的时候（整屏的字）调暗一点，不然会糊成一片白
+    const dense = Math.max(0.3, Math.min(1, gap / (1.3 * dpr)));
+    // 形状的“体量”：曲面是 1，笔画很细的文字接近 0
+    const bulk = Math.sqrt(Math.min(1, area / 3));
 
     gl.viewport(0, 0, W, H);
     gl.clearColor(0, 0, 0, 0);
@@ -684,7 +733,8 @@ export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions
     gl.uniform3f(r.u.color.uTint, tint[0], tint[1], tint[2]);
     if (light) gl.uniform3f(r.u.color.uHot, glow[0], glow[1], glow[2]);
     else gl.uniform3f(r.u.color.uHot, 0.86, 0.98, 1);
-    gl.uniform1f(r.u.color.uGain, light ? 1 : 1.25);
+    // 深色主题是加色混合，密了要压暗；浅色主题是墨点，文字反而要画浓一点才压得住纸面
+    gl.uniform1f(r.u.color.uGain, light ? 1 + 1.1 * (1 - bulk) : 1.25 * dense);
     gl.colorMask(true, true, true, true);
     gl.depthMask(false);
     gl.depthFunc(gl.LEQUAL);
@@ -698,10 +748,11 @@ export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions
     if (!light) {
       // 数量要少、每个要够亮：画布只有 8 位，太淡的圆叠多少层都会被量化成 0
       const haloCount = Math.min(3000, Math.floor(drawCount / 10));
-      const haloSize = Math.min(R * 0.16, 72 * dpr);
+      // 光晕的大小跟着形状的“体量”走：整屏的字虽然画得大，笔画却很细，光晕要收小，不然字会发虚
+      const haloSize = Math.max(10 * dpr, Math.min(R * 0.16 * bulk, 72 * dpr));
       common(r.u.color, haloSize, 0, 1);
       // 让叠出来的总亮度大致恒定，和粒子数、画布大小无关
-      gl.uniform1f(r.u.color.uGain, Math.min(0.08, (3 * R * R) / (haloCount * haloSize * haloSize)));
+      gl.uniform1f(r.u.color.uGain, Math.min(0.08, (3 * bulk * R * R) / (haloCount * haloSize * haloSize)) * (0.55 + 0.45 * bulk));
       gl.disable(gl.DEPTH_TEST);
       gl.drawArrays(gl.POINTS, 0, haloCount);
     }
@@ -709,17 +760,20 @@ export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions
   };
 
   const next = () => {
-    if (!res) return;
+    // 跳过还没准备好的文字目标
+    const from = morphing ? modelB : modelA;
+    let to = from;
+    do to = (to + 1) % targets.length;
+    while (to !== from && !ready(to));
+    goto(to);
+  };
+  const goto = (to: number) => {
+    if (!res || to < 0 || to >= targets.length || to === (morphing ? modelB : modelA)) return;
     if (morphing) {
-      // 形变途中又点了一次：直接跳到终点再出发，粒子的位置是连续的（都在显存里），不会闪
+      // 形变途中又换了目标：直接把出发点换成原来的终点再出发，粒子的位置是连续的（都在显存里），不会闪
       modelA = modelB;
       tilt = targets[modelA].tilt;
     }
-    // 跳过还没准备好的文字目标
-    let to = modelA;
-    do to = (to + 1) % targets.length;
-    while (to !== modelA && !ready(to));
-    if (to === modelA) return;
     modelB = to;
     tiltFrom = tilt;
     mix = 0;
@@ -793,7 +847,7 @@ export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions
     spinVel = Math.max(-15, Math.min(15, spinVel));
     if (click) {
       burst = 1;
-      next();
+      if (opts.clickNext !== false) next();
     }
   };
 
@@ -818,7 +872,7 @@ export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions
     if (!drag) {
       if (targets[morphing ? modelB : modelA].flat) {
         // 文字：转回正面，然后只左右轻轻摆
-        const want = Math.round(spin / TAU) * TAU + 0.32 * Math.sin(time * 0.6);
+        const want = Math.round(spin / TAU) * TAU + (targets[morphing ? modelB : modelA].sway ?? 0.32) * Math.sin(time * 0.6);
         spin += (want - spin) * (1 - Math.exp(-3 * dt));
         spinVel = 0;
       } else {
@@ -827,7 +881,7 @@ export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions
       }
       idleFor += dt;
       if (idleFor > 1.2) tiltDrag *= Math.pow(0.09, dt);
-      if (idleFor > AUTO_NEXT && !morphing && scatter < 0.05 && targets.length > 1) next();
+      if (opts.auto !== false && idleFor > AUTO_NEXT && !morphing && scatter < 0.05 && targets.length > 1) next();
     } else {
       spinVel *= Math.pow(1e-9, dt);
     }
@@ -843,6 +897,7 @@ export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions
 
     // 字体加载、图片撑开等原因会让占位格悄悄挪位置（尺寸没变，ResizeObserver 不会通知），每半秒对一次
     if (frames % 30 === 0) fit();
+    else place();
 
     step(dt, false);
     draw();
@@ -877,6 +932,7 @@ export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions
   // 减弱动效：不跑物理，粒子直接贴在目标上，只在需要时重画一帧
   const renderStatic = () => {
     if (!res) return;
+    place();
     step(0, true);
     draw();
     opts.onStats?.({ fps: 0, count: drawCount });
@@ -915,10 +971,11 @@ export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions
   // 文字目标在后台准备：好了以后如果它正是当前要显示的，粒子立刻朝它聚拢
   let alive = true;
   targets.forEach((t, i) => {
-    if (!('text' in t)) return;
-    rasterize(t.text, !!t.italic, N).then((data) => {
-      if (!data || !alive) return;
-      textData[i] = data;
+    if (!('lines' in t)) return;
+    rasterize(t.lines, N).then((out) => {
+      if (!out || !alive) return;
+      textData[i] = out.data;
+      areas[i] = out.area;
       if (res && (i === modelA || i === modelB)) {
         bindModels();
         if (reduce) renderStatic();
@@ -946,6 +1003,7 @@ export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions
 
   return {
     next,
+    goto,
     refresh,
     setScroll(p: number) {
       scatter = Math.max(0, Math.min(1, p));

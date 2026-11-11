@@ -483,7 +483,7 @@ const host = SITE.author.toLowerCase().replace(/[^a-z0-9]+/g, '') || 'blog';
         `Categories: ${new Set(posts.map((p) => p.category)).size}`,
         `Uptime:     ${commands.uptime([], { stdin: null, close() {}, clear() {} })}`,
         `Theme:      ${document.documentElement.dataset.theme}`,
-        `Renderer:   ${gl ? 'WebGL2 · transform feedback' : 'Canvas 2D'}`,
+        `Renderer:   ${gl ? 'WebGL2 · transform feedback' : 'WebGL2 unavailable'}`,
         `Viewport:   ${innerWidth}×${innerHeight} @${devicePixelRatio}x`,
       ];
       return Array.from({ length: Math.max(art.length, info.length) }, (_, i) => `${art[i] ?? ' '.repeat(14)}  ${info[i] ?? ''}`).join('\n');

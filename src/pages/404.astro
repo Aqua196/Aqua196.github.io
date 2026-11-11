@@ -98,9 +98,8 @@ import { url } from '../utils/url';
   import { mountSculpture } from '../scripts/mount';
 
   let cleanup: (() => void) | null = null;
-  let visit = 0;
 
-  document.addEventListener('astro:page-load', async () => {
+  document.addEventListener('astro:page-load', () => {
     // 404 页是同一个静态文件，访问的真实路径只能在浏览器里拿到
     const el = document.getElementById('missing-path');
     if (el) el.textContent = decodeURI(location.pathname);
@@ -109,21 +108,26 @@ import { url } from '../utils/url';
     const art = document.getElementById('nf-art');
     const section = document.getElementById('nf');
     if (!stage || !art || !section) return;
-    const mine = ++visit;
-    const mounted = await mountSculpture({
-      stage,
-      art,
-      targets: [{ text: '404', tilt: 0.05, flat: true }],
+    // 占位格的位置只在尺寸变化时量一次，每帧直接用缓存
+    let box = { x: 0, y: 0, r: 100 };
+    const measure = () => {
+      const a = art.getBoundingClientRect();
+      const c = stage.getBoundingClientRect();
       // “404” 的宽高比约 1.56，比占位格（1.7 : 1）略窄：按高度留一点边
-      radius: 0.76,
+      box = { x: a.left + a.width / 2 - c.left, y: a.top + a.height / 2 - c.top, r: Math.min(a.width, a.height) * 0.76 };
+    };
+    measure();
+    const mounted = mountSculpture({
+      stage,
+      layout: () => box,
+      measure,
+      targets: [{ lines: [[{ text: '4' }, { text: '0', italic: true, accent: true }, { text: '4' }]], tilt: 0.05, flat: true }],
     });
     if (!mounted) return;
-    if (mine !== visit) return mounted.destroy();
     section.classList.add('gl');
     cleanup = mounted.destroy;
   });
   document.addEventListener('astro:before-swap', () => {
-    visit++;
     cleanup?.();
     cleanup = null;
   });

@@ -1,0 +1,698 @@
+---
+import { SITE } from '../config';
+import { categoryMeta } from '../utils/posts';
+import { url, categoryUrl } from '../utils/url';
+
+interface Props {
+  postCount: number;
+  categoryCount: number;
+  tagCount: number;
+  /** 每个分类的文章数 */
+  counts: Map<string, number>;
+}
+const { postCount, categoryCount, tagCount, counts } = Astro.props;
+const pad = (n: number) => String(n).padStart(2, '0');
+// ID 结尾的数字单独排成斜体：Aqua196 → Aqua + 196
+const [, word = SITE.author, digits = ''] = /^(.*?)(\d+)$/.exec(SITE.author) ?? [];
+
+// 往下滚的每一章：一个数学对象对应一个方向。顺序要和脚本里 targets 的顺序一致（第 0 个目标是名字）。
+const chapters = [
+  {
+    key: 'pwn',
+    fig: 'trefoil knot',
+    note: 'crossing number = 3',
+    body: '三叶结是最简单的、解不开的结。堆上的一团 chunk 看起来也是这样，但它总有一根线头：一个没清空的指针，一次多写的字节。',
+  },
+  {
+    key: 'reverse',
+    fig: 'möbius strip',
+    note: 'one side, one edge',
+    body: '沿着它走一圈，你会回到起点的背面。逆向也是这样：顺着控制流绕回来，看到的是同一段程序的另一面。',
+  },
+  {
+    key: 'web',
+    fig: 'klein bottle',
+    note: 'non-orientable, χ = 0',
+    body: '克莱因瓶没有里外之分。很多 Web 漏洞的根源也在这里：数据和代码之间，本该有一道边界。',
+  },
+  {
+    key: 'crypto',
+    fig: 'borromean rings',
+    note: 'no two rings are linked',
+    body: '三个环扣在一起，任意抽掉一个，剩下两个就散了。密码方案的安全性常常就是这种结构：每一环都不能出错。',
+  },
+  {
+    key: 'algo',
+    fig: '196',
+    note: 'smallest Lychrel candidate',
+    body: '把 196 倒过来加上自己，再倒过来、再加……至今没人知道它会不会变成回文数。问题一句话就能讲清楚，答案却不一定。',
+  },
+].map((c) => ({ ...c, ...categoryMeta(c.key), count: counts.get(c.key) ?? 0 }));
+---
+
+<section class="opening" id="opening" data-word={word} data-digits={digits}>
+  <div class="stage">
+    <canvas id="stage" aria-hidden="true"></canvas>
+
+    <!-- 海报：有 WebGL2 时中间那行大字由粒子拼出来（h1 还在，只是透明）；没有的话就直接显示它 -->
+    <div class="poster container" id="poster">
+      <div class="top">
+        <p class="eyebrow label"><i aria-hidden="true"></i>{SITE.subtitle}</p>
+        <p class="hud mono" id="hud" hidden>
+          <span><b id="hud-count">0</b> particles</span>
+          <span>GPU physics</span>
+          <span><b id="hud-fps">60</b> fps</span>
+        </p>
+      </div>
+      <h1 class="name" id="name" aria-label={SITE.author}>
+        <span class="word">
+          {[...word].map((ch, i) => <span class="ch" aria-hidden="true" style={`--i:${i}`}>{ch}</span>)}
+        </span>{
+          digits && (
+            <em>
+              {[...digits].map((ch, i) => (
+                <span class="ch" aria-hidden="true" style={`--i:${word.length + i}`}>{ch}</span>
+              ))}
+            </em>
+          )
+        }
+      </h1>
+      <div class="base">
+        <div class="intro">
+          <p class="lead">{SITE.description}</p>
+          <p class="typer mono">
+            <span class="prompt" aria-hidden="true">$</span>
+            <span class="typed" id="typed" data-lines={JSON.stringify(SITE.taglines)}>{SITE.taglines[0]}</span><span
+              class="caret"
+              aria-hidden="true"></span>
+          </p>
+          <a class="skip-intro more-link" href="#latest">跳过开场，直接看文章</a>
+        </div>
+        <a class="cue mono" href="#chapters" aria-label="往下滚动">
+          <span>scroll</span>
+          <i aria-hidden="true"></i>
+        </a>
+        <div class="stats">
+          <a href={url('/archive')}><span class="v" data-count={postCount}>{pad(postCount)}</span><span class="k">Writeups</span></a>
+          <a href={url('/categories')}><span class="v" data-count={categoryCount}>{pad(categoryCount)}</span><span class="k">Categories</span></a>
+          <a href={url('/tags')}><span class="v" data-count={tagCount}>{pad(tagCount)}</span><span class="k">Tags</span></a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <ol class="chapters" id="chapters">
+    {
+      chapters.map((c, i) => (
+        <li class="chapter" data-tone style={`--h:${c.hue}`}>
+          <div class="container">
+            <div class="card">
+              <p class="no mono">
+                <b>{pad(i + 1)}</b> / {pad(chapters.length)}
+              </p>
+              <h2>{c.label}</h2>
+              <p class="fig mono">
+                fig. {i + 1} — {c.fig}
+                <span>{c.note}</span>
+              </p>
+              <p class="body">{c.body}</p>
+              {c.count > 0 ? (
+                <a class="more-link" href={categoryUrl(c.key)}>
+                  {c.count} 篇 writeup
+                </a>
+              ) : (
+                <span class="soon mono">writeup 还在路上</span>
+              )}
+            </div>
+          </div>
+        </li>
+      ))
+    }
+    <li class="exit">
+      <div class="container">
+        <a class="btn btn-primary" href="#latest" data-magnetic>
+          读文章 <span class="arr down" aria-hidden="true">↓</span>
+        </a>
+      </div>
+    </li>
+  </ol>
+</section>
+
+<style>
+  /* 整个开场垫在页头下面（页头是半透明的），画面从视口最顶上开始 */
+  .opening {
+    position: relative;
+    margin-top: calc(-1 * var(--header-h));
+  }
+  /* 舞台钉在视口里不动，后面的章节从它上面滚过去 */
+  .stage {
+    position: sticky;
+    top: 0;
+    height: 100svh;
+    isolation: isolate;
+  }
+  #stage {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+    /* 竖直方向留给页面滚动，水平拖动才交给旋转 */
+    touch-action: pan-y;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  #stage:global(.dragging) {
+    cursor: grabbing;
+  }
+
+  /* ---------- 海报 ---------- */
+  .poster {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    padding-top: calc(var(--header-h) + 2rem);
+    padding-bottom: 2.2rem;
+    /* --out：0 = 刚进页面，1 = 已经滚进第一章。由脚本按滚动位置写入 */
+    opacity: calc(1 - var(--out, 0));
+    pointer-events: none;
+  }
+  .top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    margin: 0;
+  }
+  .eyebrow i {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-soft);
+  }
+  .hud {
+    display: flex;
+    gap: 0.4rem 1.1rem;
+    margin: 0;
+    font-size: 0.7rem;
+    color: var(--muted);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .hud[hidden] {
+    display: none;
+  }
+  .hud span + span::before {
+    content: '/';
+    margin-right: 1.1rem;
+    color: var(--line-2);
+  }
+  .hud b {
+    font-weight: 500;
+    color: var(--fg-2);
+  }
+  /* 名字占满中间剩下的全部空间；粒子版本就画在这个盒子的正中 */
+  .name {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(4.6rem, 22vw, 20rem);
+    font-weight: 400;
+    line-height: 0.9;
+    letter-spacing: -0.03em;
+    white-space: nowrap;
+    transition: opacity 0.5s;
+  }
+  .name em {
+    color: var(--accent);
+    letter-spacing: -0.02em;
+    margin-left: 0.05em;
+  }
+  .opening:global(.gl) .name {
+    opacity: 0;
+  }
+  .base {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: end;
+    gap: 2rem;
+  }
+  .base > * {
+    pointer-events: auto;
+  }
+  .lead {
+    max-width: 26rem;
+    margin: 0;
+    font-size: clamp(1rem, 1.5vw, 1.15rem);
+    color: var(--fg-2);
+    text-wrap: pretty;
+  }
+  /* 单行 + 省略号：标语长短不一，不能让它换行把下面的内容顶上顶下 */
+  .typer {
+    display: flex;
+    align-items: center;
+    max-width: 100%;
+    margin: 0.7rem 0 0;
+    height: 1.8em;
+    font-size: 0.82rem;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .typed {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .caret {
+    flex: none;
+  }
+  .prompt {
+    flex: none;
+    color: var(--accent);
+    margin-right: 0.7rem;
+  }
+  .skip-intro {
+    margin-top: 0.9rem;
+  }
+  .skip-intro::after {
+    content: '↓';
+  }
+  .skip-intro:hover::after {
+    transform: translateY(3px);
+  }
+  .cue {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.68rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    transition: color 0.2s;
+  }
+  .cue:hover {
+    color: var(--accent);
+  }
+  /* 一条不断往下“滴”的细线 */
+  .cue i {
+    position: relative;
+    width: 1px;
+    height: 44px;
+    background: var(--line-2);
+    overflow: hidden;
+  }
+  .cue i::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--accent);
+    animation: cue-drip 2.2s var(--ease) infinite;
+  }
+  @keyframes cue-drip {
+    from {
+      transform: translateY(-100%);
+    }
+    to {
+      transform: translateY(100%);
+    }
+  }
+  .stats {
+    display: flex;
+    justify-content: flex-end;
+    gap: clamp(1.4rem, 3.5vw, 3.2rem);
+  }
+  .stats > * {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+  .v {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 3.6vw, 2.8rem);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    transition: color 0.2s;
+  }
+  .k {
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .stats a:hover .v {
+    color: var(--accent);
+  }
+
+  /* ---------- 章节 ---------- */
+  .chapters {
+    position: relative;
+    z-index: 1;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    /* 文字浮在舞台上面：空白处的指针事件要漏下去给画布 */
+    pointer-events: none;
+  }
+  .chapter {
+    display: flex;
+    align-items: center;
+    min-height: 88vh;
+  }
+  .card {
+    width: min(100%, 27rem);
+    pointer-events: auto;
+    transition: opacity 0.5s, transform 0.7s var(--ease);
+  }
+  /* 雕塑在左右之间来回走，文字始终站在它对面 */
+  .chapter:nth-child(even) .card {
+    margin-left: auto;
+  }
+  /* 只有当前这一章是实的，前后两章退成淡影 */
+  :global(.js) .chapter:not(:global(.on)) .card {
+    opacity: 0.16;
+    transform: translateY(18px);
+  }
+  .no {
+    margin: 0;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+  }
+  .no b {
+    font-weight: 500;
+    color: var(--cat);
+  }
+  h2 {
+    margin: 0.7rem 0 0.9rem;
+    font-family: var(--font-display);
+    font-size: clamp(4rem, 9vw, 7rem);
+    font-weight: 400;
+    line-height: 0.95;
+    letter-spacing: -0.02em;
+  }
+  .fig {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2rem 1rem;
+    margin: 0 0 1.4rem;
+    padding-bottom: 1.1rem;
+    font-size: 0.72rem;
+    color: var(--fg-2);
+    border-bottom: 1px solid var(--line-2);
+  }
+  .fig span {
+    color: var(--muted);
+  }
+  .body {
+    margin: 0 0 1.6rem;
+    font-size: 1.08rem;
+    line-height: 1.9;
+    color: var(--fg-2);
+    text-wrap: pretty;
+  }
+  .card .more-link {
+    font-size: 0.8rem;
+    color: var(--cat);
+  }
+  .soon {
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+  .exit {
+    display: flex;
+    align-items: flex-start;
+    min-height: 34vh;
+    text-align: center;
+  }
+  .exit .btn {
+    pointer-events: auto;
+  }
+
+  /* 没有 WebGL2（或没有 JS）：舞台不再钉住，就是一张普通的海报，下面接着普通的章节 */
+  .opening:not(:global(.gl)) .stage {
+    position: relative;
+  }
+  .opening:not(:global(.gl)) .chapter {
+    min-height: 0;
+    padding: 4rem 0;
+  }
+  .opening:not(:global(.gl)) .chapter .card {
+    opacity: 1;
+    transform: none;
+  }
+
+  @media (max-width: 900px) {
+    .base {
+      grid-template-columns: 1fr auto;
+      gap: 1.4rem 1rem;
+    }
+    .intro {
+      grid-column: 1 / -1;
+    }
+    .cue {
+      order: 3;
+      flex-direction: row-reverse;
+    }
+    .cue i {
+      height: 28px;
+    }
+    .stats {
+      justify-content: flex-start;
+    }
+    .hud span:nth-child(2) {
+      display: none;
+    }
+    /* 小屏：雕塑在上半屏，文字卡片贴着下沿，带一层半透明的底，从雕塑上滚过去时还能读 */
+    .chapter {
+      align-items: flex-end;
+      min-height: 92vh;
+      padding-bottom: 7vh;
+    }
+    .card,
+    .chapter:nth-child(even) .card {
+      width: 100%;
+      margin: 0;
+      padding: 1.4rem 1.3rem 1.5rem;
+      background: color-mix(in srgb, var(--bg) 78%, transparent);
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+    }
+    h2 {
+      font-size: clamp(3rem, 15vw, 4.4rem);
+    }
+    .body {
+      font-size: 1rem;
+      line-height: 1.8;
+    }
+    .opening:not(:global(.gl)) .chapter {
+      padding: 1rem 0;
+    }
+  }
+  @media (max-width: 520px) {
+    .name {
+      /* 竖屏放不下一整行：名字和数字各占一行 */
+      flex-direction: column;
+      font-size: clamp(5rem, 34vw, 9rem);
+      line-height: 0.82;
+    }
+    .name em {
+      margin-left: 0;
+    }
+    .hud span:nth-child(3) {
+      display: none;
+    }
+  }
+</style>
+
+<script>
+  import { mountSculpture } from '../scripts/mount';
+  import type { Target } from '../scripts/particles';
+  import { MODELS } from '../scripts/surfaces';
+
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let timers: number[] = [];
+  let cleanup: (() => void) | null = null;
+  const later = (fn: () => void, ms: number) => timers.push(window.setTimeout(fn, ms));
+
+  function typewriter(el: HTMLElement, lines: string[]) {
+    if (lines.length < 2) return;
+    let li = 0;
+    let ci = lines[0].length;
+    let deleting = true;
+    const step = () => {
+      if (deleting) {
+        el.textContent = lines[li].slice(0, --ci);
+        if (ci <= 0) {
+          deleting = false;
+          li = (li + 1) % lines.length;
+        }
+        later(step, 25);
+      } else {
+        el.textContent = lines[li].slice(0, ++ci);
+        if (ci >= lines[li].length) {
+          deleting = true;
+          later(step, 2400);
+        } else later(step, 45 + Math.random() * 55);
+      }
+    };
+    later(step, 2400);
+  }
+
+  function countUp(el: HTMLElement) {
+    const n = Number(el.dataset.count);
+    const start = performance.now();
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - start) / 1200);
+      el.textContent = String(Math.round(n * (1 - Math.pow(1 - p, 3)))).padStart(2, '0');
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+
+  // ---------- 开场：粒子 + 滚动 ----------
+  function opening() {
+    const root = document.getElementById('opening');
+    const stage = document.getElementById('stage') as HTMLCanvasElement | null;
+    const poster = document.getElementById('poster');
+    const name = document.getElementById('name');
+    if (!root || !stage || !poster || !name) return;
+    const chapters = [...root.querySelectorAll<HTMLElement>('.chapter')];
+    const $ = (id: string) => document.getElementById(id);
+
+    // 目标 0 是名字，1 ~ 4 是曲面，5 是 “196”。和上面模板里 chapters 的顺序一一对应。
+    const word = root.dataset.word || '';
+    const digits = root.dataset.digits || '';
+    const stacked = () => innerWidth <= 520 && !!word && !!digits;
+    const nameRuns = [{ text: word }, ...(digits ? [{ text: digits, italic: true, accent: true }] : [])].filter((r) => r.text);
+    const targets: Target[] = [
+      { lines: stacked() ? nameRuns.map((r) => [r]) : [nameRuns], tilt: 0.03, flat: true, sway: 0.06 },
+      ...MODELS.map((m, i) => ({ surface: i, tilt: m.tilt })),
+      { lines: [[{ text: '196', italic: true, accent: true }]], tilt: 0.06, flat: true, sway: 0.22 },
+    ];
+
+    // ---------- 布局：雕塑在舞台上的位置和大小 ----------
+    // 每一幕有一个“想去的位置”，实际位置每帧朝它靠近一点，所以换幕时雕塑是滑过去的。
+    type Box = { x: number; y: number; r: number };
+    let W = 1, H = 1;
+    let nameBox: Box = { x: 0, y: 0, r: 100 };
+    let scene = 0; // 0 = 名字，1..n = 第几章
+    const want = (): Box => {
+      if (scene === 0) return nameBox;
+      if (W < 900) return { x: W / 2, y: H * 0.3, r: Math.min(W * 0.4, H * 0.21) };
+      const r = Math.min(W * 0.2, H * 0.34);
+      // 第 1、3、5 章文字在左、雕塑在右；偶数章反过来
+      return { x: scene % 2 ? W * 0.7 : W * 0.3, y: H * 0.52, r: scene === targets.length - 1 ? r * 0.9 : r };
+    };
+    const measure = () => {
+      const s = stage.getBoundingClientRect();
+      const n = name.getBoundingClientRect();
+      W = s.width;
+      H = s.height;
+      // 名字的宽高比：一行大约 3.7 : 1，拆成两行大约 1.3 : 1（往窄了估，宁可小一点也不出界）
+      const aspect = stacked() ? 1.3 : 3.7;
+      // 名字不受版心限制：按整个舞台的宽度来，只留一点边
+      const width = Math.min(W * 0.9, n.height * 0.92 * aspect, 1560);
+      // 文字目标的半宽对应 0.97 个单位
+      nameBox = { x: n.left + n.width / 2 - s.left, y: n.top + n.height / 2 - s.top, r: width / 2 / 0.97 };
+    };
+    measure();
+    let box = want();
+    let last = performance.now();
+    const layout = () => {
+      const now = performance.now();
+      const k = reduce ? 1 : 1 - Math.exp(-Math.min(0.1, (now - last) / 1000) * 3.2);
+      last = now;
+      const to = want();
+      box = { x: box.x + (to.x - box.x) * k, y: box.y + (to.y - box.y) * k, r: box.r + (to.r - box.r) * k };
+      return box;
+    };
+
+    const fmt = new Intl.NumberFormat('en-US');
+    const sculpture = mountSculpture({
+      stage,
+      layout,
+      measure,
+      targets,
+      auto: false,
+      clickNext: false,
+      onStats: ({ fps, count }) => {
+        $('hud-count')!.textContent = fmt.format(count);
+        $('hud-fps')!.textContent = fps ? String(fps) : '—';
+      },
+    });
+    if (sculpture) {
+      root.classList.add('gl');
+      $('hud')!.hidden = false;
+    }
+
+    // ---------- 滚动：决定现在是哪一幕 ----------
+    let ticking = false;
+    const update = () => {
+      ticking = false;
+      const vh = innerHeight;
+      // 海报随着滚动淡出；淡到看不见以后整块设为 inert，里面的链接不再能被点到或 Tab 到
+      const out = Math.min(1, scrollY / (vh * 0.45));
+      poster.style.setProperty('--out', out.toFixed(3));
+      poster.inert = out > 0.95;
+      // 当前章 = 最后一个顶边越过视口 62% 处的章节
+      let active = 0;
+      chapters.forEach((c, i) => {
+        if (c.getBoundingClientRect().top < vh * 0.62) active = i + 1;
+      });
+      chapters.forEach((c, i) => c.classList.toggle('on', i + 1 === active));
+      if (active !== scene) {
+        scene = active;
+        sculpture?.goto(active);
+      }
+      // 整个开场滚出视口的过程里，把雕塑吹散
+      sculpture?.setScroll((vh - root.getBoundingClientRect().bottom) / (vh * 0.55));
+    };
+    const onScroll = () => {
+      if (!ticking) {
+        ticking = true;
+        requestAnimationFrame(update);
+      }
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    update();
+
+    cleanup = () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      sculpture?.destroy();
+    };
+  }
+
+  function init() {
+    opening();
+    const typed = document.getElementById('typed');
+    if (!typed || reduce) return;
+    typewriter(typed, JSON.parse(typed.dataset.lines || '[]'));
+    document.querySelectorAll<HTMLElement>('.stats .v[data-count]').forEach(countUp);
+  }
+
+  document.addEventListener('astro:page-load', init);
+  document.addEventListener('astro:before-swap', () => {
+    timers.forEach(clearTimeout);
+    timers = [];
+    cleanup?.();
+    cleanup = null;
+  });
+</script>

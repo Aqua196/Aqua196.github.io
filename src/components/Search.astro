@@ -8,7 +8,6 @@ const commands = [
   { id: 'theme', label: '切换明暗主题', group: '操作', keys: 'theme dark light 主题 深色 浅色 夜间', action: 'theme' },
   { id: 'terminal', label: '打开终端', group: '操作', keys: 'terminal shell 终端 命令行', action: 'terminal', kbd: '`' },
   { id: 'random', label: '随机读一篇', group: '操作', keys: 'random 随机 lucky', action: 'random' },
-  { id: 'sculpture', label: '换一个曲面（首页）', group: '操作', keys: 'next model surface 曲面 模型 粒子', action: 'sculpture' },
   { id: 'copy', label: '复制当前页链接', group: '操作', keys: 'copy link url 复制 链接', action: 'copy' },
   { id: 'colophon', label: '本站是怎么做的', group: '跳转', keys: 'colophon about site 技术 实现', href: url('/colophon') },
   { id: 'rss', label: 'RSS 订阅', group: '跳转', keys: 'rss feed 订阅', href: url('/rss.xml'), external: true },
@@ -342,9 +341,8 @@ const commands = [
 
   function matchCommands(q: string) {
     const ts = terms(q.replace(/^>\s*/, ''));
-    const here = commands.filter((c) => c.action !== 'sculpture' || document.getElementById('stage'));
-    if (!ts.length) return here;
-    return here.filter((c) => ts.every((t) => c.f.includes(t)));
+    if (!ts.length) return commands;
+    return commands.filter((c) => ts.every((t) => c.f.includes(t)));
   }
 
   function run(dialog: HTMLDialogElement, cmd: Cmd) {
@@ -360,10 +358,6 @@ const commands = [
         break;
       case 'terminal':
         document.dispatchEvent(new CustomEvent('terminal:open'));
-        break;
-      case 'sculpture':
-        document.dispatchEvent(new CustomEvent('sculpture:next'));
-        window.scrollTo({ top: 0, behavior: 'smooth' });
         break;
       case 'copy':
         navigator.clipboard?.writeText(location.href).catch(() => {});

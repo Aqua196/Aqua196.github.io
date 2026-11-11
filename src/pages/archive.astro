@@ -1,15 +1,43 @@
 ---
-import Kinetic from '../components/Kinetic.astro';
 import Base from '../layouts/Base.astro';
 import Empty from '../components/Empty.astro';
-import { getPosts, categoryMeta, formatDate } from '../utils/posts';
+import Kinetic from '../components/Kinetic.astro';
+import { getPosts, categoryMeta, formatDate, type Post } from '../utils/posts';
 import { postUrl } from '../utils/url';
 
 const posts = await getPosts();
-const byYear = new Map<string, typeof posts>();
+const byYear = new Map<string, Post[]>();
 for (const p of posts) {
   const y = formatDate(p.data.date).slice(0, 4);
   byYear.set(y, [...(byYear.get(y) ?? []), p]);
+}
+
+// ---------- 每年一条日历热力带：一列是一周，一格是一天 ----------
+const CELL = 11;
+const GAP = 3;
+const STEP = CELL + GAP;
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function calendar(year: number, list: Post[]) {
+  // 用 UTC 做纯日期运算，避开时区和夏令时；文章落在哪一天以 formatDate（东八区）为准
+  const first = Date.UTC(year, 0, 1);
+  const offset = new Date(first).getUTCDay();
+  const length = (Date.UTC(year + 1, 0, 1) - first) / 86400000;
+  const byDay = new Map<string, Post[]>();
+  for (const p of list) {
+    const key = formatDate(p.data.date);
+    byDay.set(key, [...(byDay.get(key) ?? []), p]);
+  }
+  const cells = Array.from({ length }, (_, d) => {
+    const date = new Date(first + d * 86400000);
+    const key = date.toISOString().slice(0, 10);
+    return { key, x: Math.floor((d + offset) / 7) * STEP, y: ((d + offset) % 7) * STEP, posts: byDay.get(key) ?? [] };
+  });
+  const months = MONTHS.map((label, m) => {
+    const d = (Date.UTC(year, m, 1) - first) / 86400000;
+    return { label, x: Math.floor((d + offset) / 7) * STEP };
+  });
+  return { cells, months, width: Math.ceil((length + offset) / 7) * STEP - GAP, height: 7 * STEP - GAP };
 }
 ---
 
@@ -18,35 +46,59 @@ for (const p of posts) {
     <header class="page-head">
       <div class="eyebrow" data-reveal>git log --oneline</div>
       <h1><Kinetic text="Archive" /></h1>
-      <p data-reveal style="--delay:.1s">共 {posts.length} 篇，按时间倒序。</p>
+      <p data-reveal style="--delay:.1s">共 {posts.length} 篇，按时间倒序。每个点是一天，亮起来的那天有文章。</p>
     </header>
 
     {posts.length === 0 && <Empty cmd="git log --oneline" />}
     {
-      [...byYear].map(([year, list]) => (
-        <section class="year">
-          <h2 class="y" data-reveal>
-            {year}
-            <small class="mono">{String(list.length).padStart(2, '0')} posts</small>
-          </h2>
-          <ol>
-            {list.map((p, i) => {
-              const cat = categoryMeta(p.data.category);
-              return (
-                <li data-reveal data-tone style={`--h:${cat.hue};--delay:${Math.min(i, 10) * 0.03}s`}>
-                  <a href={postUrl(p.id)}>
-                    <time class="mono" datetime={p.data.date.toISOString()}>
-                      {formatDate(p.data.date).slice(5)}
-                    </time>
-                    <span class="t">{p.data.title}</span>
-                    <span class="chip">{cat.label}</span>
-                  </a>
-                </li>
-              );
-            })}
-          </ol>
-        </section>
-      ))
+      [...byYear].map(([year, list]) => {
+        const cal = calendar(Number(year), list);
+        return (
+          <section class="year">
+            <h2 class="y" data-reveal>
+              {year}
+              <small class="mono">{String(list.length).padStart(2, '0')} posts</small>
+            </h2>
+            <div class="main">
+              <div class="cal" data-reveal>
+                <svg viewBox={`0 -16 ${cal.width} ${cal.height + 16}`} role="img" aria-label={`${year} 年的发文日历，共 ${list.length} 篇`}>
+                  {cal.months.map((m) => (
+                    <text class="month" x={m.x} y="-6">
+                      {m.label}
+                    </text>
+                  ))}
+                  {cal.cells.map((c) =>
+                    c.posts.length ? (
+                      <a href={postUrl(c.posts[0].id)} data-day={c.key} data-tone style={`--h:${categoryMeta(c.posts[0].data.category).hue}`}>
+                        <title>{`${c.key} · ${c.posts.map((p) => p.data.title).join(' / ')}`}</title>
+                        <rect class="day on" x={c.x} y={c.y} width={CELL} height={CELL} rx="2.5" />
+                      </a>
+                    ) : (
+                      <rect class="day" x={c.x} y={c.y} width={CELL} height={CELL} rx="2.5" />
+                    ),
+                  )}
+                </svg>
+              </div>
+              <ol>
+                {list.map((p, i) => {
+                  const cat = categoryMeta(p.data.category);
+                  return (
+                    <li data-reveal data-tone data-day={formatDate(p.data.date)} style={`--h:${cat.hue};--delay:${Math.min(i, 10) * 0.03}s`}>
+                      <a href={postUrl(p.id)}>
+                        <time class="mono" datetime={p.data.date.toISOString()}>
+                          {formatDate(p.data.date).slice(5)}
+                        </time>
+                        <span class="t">{p.data.title}</span>
+                        <span class="chip">{cat.label}</span>
+                      </a>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          </section>
+        );
+      })
     }
   </div>
 </Base>
@@ -79,6 +131,54 @@ for (const p of posts) {
     text-transform: uppercase;
     color: var(--muted);
   }
+
+  /* 网格子项默认不会缩到比内容窄：不加这句，下面那条可横向滚动的日历会把整页撑宽 */
+  .main {
+    min-width: 0;
+  }
+
+  /* ---------- 日历热力带 ---------- */
+  .cal {
+    margin: 0.3rem 0 1.6rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .cal::-webkit-scrollbar {
+    display: none;
+  }
+  .cal svg {
+    display: block;
+    width: 100%;
+    min-width: 560px;
+    max-width: 760px;
+    height: auto;
+    overflow: visible;
+  }
+  .month {
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    fill: var(--muted);
+  }
+  .day {
+    fill: var(--line);
+    transition: fill 0.2s;
+  }
+  .day.on {
+    fill: var(--cat);
+    stroke: var(--cat);
+    stroke-width: 0;
+    transition: stroke-width 0.2s var(--ease);
+  }
+  /* 和下面的列表互相点亮：悬停一边，另一边对应的那天 / 那篇也亮 */
+  .cal a:hover .day,
+  .cal a:focus-visible .day,
+  .cal a:global(.hl) .day {
+    stroke-width: 4;
+  }
+  .cal a:focus-visible {
+    outline: none;
+  }
+
   ol {
     list-style: none;
     margin: 0;
@@ -97,7 +197,8 @@ for (const p of posts) {
     border-radius: var(--radius-sm);
     transition: background 0.2s;
   }
-  li a:hover {
+  li a:hover,
+  li:global(.hl) a {
     background: var(--bg-2);
   }
   time {
@@ -110,12 +211,13 @@ for (const p of posts) {
     line-height: 1.5;
     transition: color 0.2s;
   }
-  li a:hover .t {
+  li a:hover .t,
+  li:global(.hl) .t {
     color: var(--cat);
   }
   @media (max-width: 720px) {
     .year {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
     }
     .y {
       position: static;
@@ -138,3 +240,19 @@ for (const p of posts) {
     }
   }
 </style>
+
+<script>
+  // 日历上的点和列表里的条目互相高亮：两边都带着 data-day，靠它配对
+  function link(e: Event, on: boolean) {
+    const el = (e.target as Element).closest?.<HTMLElement>('.year [data-day]');
+    if (!el) return;
+    const year = el.closest('.year')!;
+    year.querySelectorAll(`[data-day="${el.dataset.day}"]`).forEach((other) => {
+      if (other !== el) other.classList.toggle('hl', on);
+    });
+  }
+  document.addEventListener('pointerover', (e) => link(e, true));
+  document.addEventListener('pointerout', (e) => link(e, false));
+  document.addEventListener('focusin', (e) => link(e, true));
+  document.addEventListener('focusout', (e) => link(e, false));
+</script>

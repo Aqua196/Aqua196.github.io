@@ -1,27 +1,20 @@
 ---
 import Base from '../layouts/Base.astro';
-import Hero from '../components/Hero.astro';
+import Opening from '../components/Opening.astro';
 import PostRow from '../components/PostRow.astro';
 import Empty from '../components/Empty.astro';
-import { CATEGORIES, SITE } from '../config';
-import { getHomePosts, countBy, categoryMeta, tagGroups } from '../utils/posts';
-import { url, categoryUrl, tagUrl } from '../utils/url';
+import { SITE } from '../config';
+import { getHomePosts, countBy, tagGroups } from '../utils/posts';
+import { url } from '../utils/url';
 
 const posts = await getHomePosts();
 const counts = new Map(countBy(posts, (p) => p.data.category));
 const tags = tagGroups(posts);
 const latest = posts.slice(0, SITE.homePostCount);
-
-// 分类索引：config 里登记的方向全部列出来（没文章的显示为空位），再补上文章里用到但没登记的
-const categories = [...new Set([...Object.keys(CATEGORIES), ...counts.keys()])].map((key) => ({
-  key,
-  ...categoryMeta(key),
-  count: counts.get(key) ?? 0,
-}));
 ---
 
 <Base>
-  <Hero postCount={posts.length} categoryCount={counts.size} tagCount={tags.length} />
+  <Opening postCount={posts.length} categoryCount={counts.size} tagCount={tags.length} counts={counts} />
 
   <section class="container block" id="latest">
     <div class="section-head" data-reveal>
@@ -49,105 +42,13 @@ const categories = [...new Set([...Object.keys(CATEGORIES), ...counts.keys()])].
       )
     }
   </section>
-
-  <section class="container block">
-    <div class="section-head" data-reveal>
-      <h2>Index<span class="zh">分类</span></h2>
-      {counts.size > 0 && <a class="more-link" href={url('/categories')}>all categories</a>}
-    </div>
-    <ul class="cats" data-reveal>
-      {
-        categories.map(({ key, label, hue, count }) => {
-          const Tag = count > 0 ? 'a' : 'div';
-          return (
-            <li data-tone style={`--h:${hue}`}>
-              <Tag
-                class:list={['cat', { off: count === 0 }]}
-                href={count > 0 ? categoryUrl(key) : undefined}
-                data-spot={count > 0 ? '' : undefined}
-                data-tilt={count > 0 ? '' : undefined}
-              >
-                <span class="chip">{label}</span>
-                <span class="count">{String(count).padStart(2, '0')}</span>
-              </Tag>
-            </li>
-          );
-        })
-      }
-    </ul>
-  </section>
-
-  {
-    tags.length > 0 && (
-      <section class="container block">
-        <div class="section-head" data-reveal>
-          <h2>Tags<span class="zh">标签</span></h2>
-          <a class="more-link" href={url('/tags')}>all tags</a>
-        </div>
-        <div class="tags" data-reveal>
-          {tags.slice(0, 30).map((t) => (
-            <a class="tag" href={tagUrl(t.name)}>
-              {t.name}
-              <span class="n">{t.posts.length}</span>
-            </a>
-          ))}
-        </div>
-      </section>
-    )
-  }
 </Base>
 
 <style>
   .block {
-    margin-top: 6.5rem;
+    margin-top: 2rem;
   }
   .more {
     margin-top: 2rem;
-  }
-
-  /* ---------- 分类 ---------- */
-  .cats {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 138px), 1fr));
-    gap: 0.75rem;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-  .cat {
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    gap: 2.2rem;
-    height: 100%;
-    padding: 1.1rem 1.2rem 1rem;
-    background: var(--bg-2);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    transition: border-color 0.25s, background 0.25s;
-  }
-  a.cat:hover {
-    border-color: var(--cat-line);
-  }
-  .count {
-    font-family: var(--font-display);
-    font-size: 2.6rem;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-  }
-  .cat.off {
-    background: transparent;
-    border-style: dashed;
-  }
-  .cat.off .chip,
-  .cat.off .count {
-    color: var(--muted);
-    opacity: 0.6;
-  }
-
-  .tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
   }
 </style>
