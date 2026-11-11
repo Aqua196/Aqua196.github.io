@@ -401,19 +401,37 @@ const hex = (s: string): Vec => {
   return [(n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
 };
 
+/** 渲染器的名字像不像软件光栅化器。有的浏览器不按 failIfMajorPerformanceCaveat 报告，所以再看一眼名字 */
+function isSoftware(gl: WebGL2RenderingContext) {
+  let name = String(gl.getParameter(gl.RENDERER));
+  // Chrome 的 RENDERER 只是一个笼统的名字，真名要从扩展里拿；Firefox 直接给，而且不建议再用这个扩展
+  if (!/\(|angle|mesa/i.test(name)) {
+    const info = gl.getExtension('WEBGL_debug_renderer_info');
+    if (info) name = String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL));
+  }
+  return /swiftshader|llvmpipe|softpipe|software|basic render/i.test(name);
+}
+
 export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions): Sculpture | null {
-  const gl = canvas.getContext('webgl2', {
+  const attributes: WebGLContextAttributes = {
     alpha: true,
     antialias: false,
     depth: true,
     premultipliedAlpha: true,
     powerPreference: 'high-performance',
-  });
+  };
+  const adaptive = opts.adaptive !== false;
+  // 先问浏览器要一个“性能有保证”的上下文：要不到、但普通的能要到，说明 WebGL 是软件模拟的
+  let gl = adaptive ? canvas.getContext('webgl2', { ...attributes, failIfMajorPerformanceCaveat: true }) : null;
+  const caveat = adaptive && !gl;
+  gl ??= canvas.getContext('webgl2', attributes);
   if (!gl) return null;
+  // 没有硬件加速、显卡被拉黑、远程桌面……这些机器上每帧十几万个粒子会把主线程占满，从一开始就只画静态帧
+  const software = adaptive && (caveat || isSoftware(gl));
 
   // 静态模式：不跑物理和动画，粒子直接贴在目标上，只在需要时重画一帧。
-  // 两种情况会进来：用户要求减弱动效；或者画质降到底还是跑不动（比如没有硬件加速、WebGL 走软件渲染）
-  let still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // 三种情况会进来：用户要求减弱动效；WebGL 是软件模拟的；或者画质降到底还是跑不动
+  let still = software || matchMedia('(prefers-reduced-motion: reduce)').matches;
   const N = opts.count;
   const targets: Target[] = opts.targets ?? MODELS.map((m, i) => ({ surface: i, tilt: m.tilt }));
   const norms = new Map<number, ReturnType<typeof bounds>>();
@@ -606,7 +624,7 @@ export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions
   // ---------- 状态 ----------
   let W = 0, H = 0, dpr = 1;
   let layout: Layout = { x: 0, y: 0, r: 100 };
-  let drawCount = N;
+  let drawCount = software ? Math.min(N, STILL_COUNT) : N;
   let dprCap = 2;
   let ink: Vec = [1, 1, 1];
   let glow: Vec = [1, 1, 1];
@@ -913,8 +931,9 @@ export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions
 
     // 自适应画质：开场稳定后如果持续掉帧，先降像素比，再减粒子；降到底还不行就停下来，改成静态帧。
     // 按时间而不是按帧数累计：帧率越低，越应该早点反应，而不是等更久
-    if (raw < 0.25) fps += (1 / raw - fps) * 0.05;
-    if (opts.adaptive !== false && now - born > WARM_UP) {
+    // rAF 给的时间戳是这一帧开始的时刻，可能比 resume() 里记下的 last 还早一点，所以 raw 可能不是正数
+    if (raw > 0.001 && raw < 0.25) fps += (1 / raw - fps) * 0.05;
+    if (adaptive && now - born > WARM_UP) {
       if (raw > 1 / 42) {
         slowTime += Math.min(raw, 0.25);
         slowFrames++;
@@ -942,7 +961,7 @@ export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions
     }
     if (now - statsAt > 500) {
       statsAt = now;
-      opts.onStats?.({ fps: Math.round(fps), count: drawCount });
+      opts.onStats?.({ fps: Math.max(1, Math.round(fps)), count: drawCount });
     }
     schedule();
   };
