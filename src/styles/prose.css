@@ -505,6 +505,10 @@ details.callout[open] > summary.callout-title::after {
 .callout-flag > summary::after {
   content: none;
 }
+/* 这块有底色，强调色直接放上去对比度差一点；往正文色靠一点（浅色主题变深、深色主题变亮） */
+.callout-flag .callout-label {
+  color: color-mix(in oklab, var(--accent) 80%, var(--fg));
+}
 .callout-redact {
   flex: 1;
   max-width: 22rem;
@@ -518,7 +522,7 @@ span.callout-hint {
   font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 400;
-  color: var(--muted);
+  color: var(--fg-2);
   transition: color 0.2s;
 }
 .callout-flag > summary:hover .callout-redact {

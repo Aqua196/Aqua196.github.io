@@ -281,7 +281,8 @@ export interface ParticleOptions {
   clickNext?: boolean;
   /** false = 不做自适应降画质（调试 / 截图用） */
   adaptive?: boolean;
-  layout: () => Layout;
+  /** 每帧调用。still 为 true 表示这是一张静态帧：有过渡动画的话请直接给终点 */
+  layout: (still: boolean) => Layout;
   onModel?: (index: number) => void;
   onStats?: (stats: { fps: number; count: number }) => void;
 }
@@ -300,6 +301,10 @@ const LIGHT = unit([-0.5, 0.6, -0.65]);
 const IDLE = -0.27; // 自转角速度（弧度 / 秒）
 const AUTO_NEXT = 16;
 const MORPH_SECONDS = 2.4;
+// 自适应画质
+const WARM_UP = 1500; // 开头这段时间不算：着色器编译、字体光栅化都在这时候
+const FLOOR = 24000; // 粒子数最少降到这里
+const STILL_COUNT = 60000; // 静态帧用的粒子数
 
 const TAU = Math.PI * 2;
 
@@ -406,7 +411,9 @@ export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions
   });
   if (!gl) return null;
 
-  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // 静态模式：不跑物理和动画，粒子直接贴在目标上，只在需要时重画一帧。
+  // 两种情况会进来：用户要求减弱动效；或者画质降到底还是跑不动（比如没有硬件加速、WebGL 走软件渲染）
+  let still = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const N = opts.count;
   const targets: Target[] = opts.targets ?? MODELS.map((m, i) => ({ surface: i, tilt: m.tilt }));
   const norms = new Map<number, ReturnType<typeof bounds>>();
@@ -630,10 +637,10 @@ export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions
       W = canvas.width = w;
       H = canvas.height = h;
     }
-    layout = opts.layout();
+    layout = opts.layout(still);
   };
   // 布局每帧都问一次调用方（调用方自己保证便宜）：雕塑可以在画面里平滑地挪位置、变大小
-  const place = () => (layout = opts.layout());
+  const place = () => (layout = opts.layout(still));
   const colors = () => {
     const cs = getComputedStyle(document.documentElement);
     ink = hex(cs.getPropertyValue('--fg'));
@@ -781,7 +788,7 @@ export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions
     idleFor = 0;
     bindModels();
     opts.onModel?.(modelB);
-    if (reduce) {
+    if (still) {
       finishMorph();
       if (targets[modelA].flat) spin = Math.round(spin / TAU) * TAU;
       renderStatic();
@@ -829,7 +836,7 @@ export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions
     tiltDrag = Math.max(-1.45 - tilt, Math.min(1.45 - tilt, tiltDrag - my * k));
     spinVel = spinVel * 0.3 - mx * k * 60 * 0.7;
     idleFor = 0;
-    if (reduce) renderStatic();
+    if (still) renderStatic();
   };
   const onDown = (e: PointerEvent) => {
     if (e.button !== 0) return;
@@ -857,6 +864,8 @@ export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions
   let visible = true;
   let fps = 60;
   let slowFrames = 0;
+  let slowTime = 0;
+  const born = performance.now();
   let frames = 0;
   let statsAt = 0;
 
@@ -902,17 +911,32 @@ export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions
     step(dt, false);
     draw();
 
-    // 自适应画质：开场稳定后如果连续掉帧，先降像素比，再减粒子
+    // 自适应画质：开场稳定后如果持续掉帧，先降像素比，再减粒子；降到底还不行就停下来，改成静态帧。
+    // 按时间而不是按帧数累计：帧率越低，越应该早点反应，而不是等更久
     if (raw < 0.25) fps += (1 / raw - fps) * 0.05;
-    if (opts.adaptive !== false && frames > 45) {
-      slowFrames = raw > 1 / 42 ? slowFrames + 1 : Math.max(0, slowFrames - 2);
-      if (slowFrames > 40) {
-        slowFrames = 0;
-        if (dprCap > 1) {
+    if (opts.adaptive !== false && now - born > WARM_UP) {
+      if (raw > 1 / 42) {
+        slowTime += Math.min(raw, 0.25);
+        slowFrames++;
+      } else {
+        slowTime = Math.max(0, slowTime - raw * 2);
+        slowFrames = Math.max(0, slowFrames - 2);
+      }
+      if (slowTime > 1) {
+        const average = slowFrames / slowTime;
+        slowTime = slowFrames = 0;
+        if (dpr <= 1 && drawCount <= FLOOR) {
+          if (average < 24) freeze();
+        } else if (average < 15) {
+          // 差得太远，一步降到底
+          dprCap = 1;
+          drawCount = Math.min(drawCount, FLOOR);
+          fit();
+        } else if (dpr > 1) {
           dprCap = 1;
           fit();
-        } else if (drawCount > 24000) {
-          drawCount = Math.max(24000, Math.floor(drawCount * 0.6));
+        } else {
+          drawCount = Math.max(FLOOR, Math.floor(drawCount * 0.6));
         }
       }
     }
@@ -923,25 +947,39 @@ export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions
     schedule();
   };
   const schedule = () => {
-    if (!raf && alive && res && !reduce && visible && !document.hidden) raf = requestAnimationFrame(frame);
+    if (!raf && alive && res && !still && visible && !document.hidden) raf = requestAnimationFrame(frame);
   };
   const resume = () => {
     last = performance.now();
     schedule();
   };
-  // 减弱动效：不跑物理，粒子直接贴在目标上，只在需要时重画一帧
+  // 静态帧。拖动、滚动一帧里可能要求重画很多次，合并成一次
+  let staticQueued = false;
   const renderStatic = () => {
-    if (!res) return;
-    place();
-    step(0, true);
-    draw();
-    opts.onStats?.({ fps: 0, count: drawCount });
+    if (staticQueued) return;
+    staticQueued = true;
+    requestAnimationFrame(() => {
+      staticQueued = false;
+      if (!alive || !res) return;
+      place();
+      step(0, true);
+      draw();
+      opts.onStats?.({ fps: 0, count: drawCount });
+    });
+  };
+  // 跑不动：停掉循环。既然不用每帧都画了，粒子数可以加回来一些，静态的画面更实
+  const freeze = () => {
+    still = true;
+    drawCount = Math.min(N, STILL_COUNT);
+    if (morphing) finishMorph();
+    if (targets[modelA].flat) spin = Math.round(spin / TAU) * TAU;
+    renderStatic();
   };
 
   const refresh = () => {
     fit();
     colors();
-    if (reduce) renderStatic();
+    if (still) renderStatic();
     else if (!raf && res) draw();
   };
 
@@ -964,7 +1002,7 @@ export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions
   try {
     init();
   } catch (err) {
-    console.warn('[sculpture] WebGL2 初始化失败，改用 CPU 渲染', err);
+    console.warn('[sculpture] WebGL2 初始化失败，页面退回纯文字版本', err);
     return null;
   }
 
@@ -978,7 +1016,7 @@ export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions
       areas[i] = out.area;
       if (res && (i === modelA || i === modelB)) {
         bindModels();
-        if (reduce) renderStatic();
+        if (still) renderStatic();
       }
     });
   });
@@ -1007,7 +1045,7 @@ export function createSculpture(canvas: HTMLCanvasElement, opts: ParticleOptions
     refresh,
     setScroll(p: number) {
       scatter = Math.max(0, Math.min(1, p));
-      if (reduce) renderStatic();
+      if (still) renderStatic();
     },
     destroy() {
       alive = false;

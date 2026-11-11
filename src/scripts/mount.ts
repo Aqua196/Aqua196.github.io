@@ -7,7 +7,7 @@ export interface MountOptions extends Pick<ParticleOptions, 'targets' | 'auto' |
   /** 铺满容器的画布 */
   stage: HTMLCanvasElement;
   /** 雕塑画在哪、画多大。每帧都会被调用，所以必须便宜（不要在里面读 DOM 布局） */
-  layout: () => Layout;
+  layout: (still: boolean) => Layout;
   /** 尺寸、主题、字体变化后调用：重新量一遍 layout 依赖的东西 */
   measure?: () => void;
 }

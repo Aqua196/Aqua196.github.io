@@ -4,8 +4,8 @@ import Opening from '../components/Opening.astro';
 import PostRow from '../components/PostRow.astro';
 import Empty from '../components/Empty.astro';
 import { SITE } from '../config';
-import { getHomePosts, countBy, tagGroups } from '../utils/posts';
-import { url } from '../utils/url';
+import { getHomePosts, countBy, tagGroups, categoryMeta } from '../utils/posts';
+import { url, categoryUrl } from '../utils/url';
 
 const posts = await getHomePosts();
 const counts = new Map(countBy(posts, (p) => p.data.category));
@@ -21,6 +21,22 @@ const latest = posts.slice(0, SITE.homePostCount);
       <h2>Latest<span class="zh">最新文章</span></h2>
       {posts.length > 0 && <a class="more-link" href={url('/archive')}>view all</a>}
     </div>
+    {
+      /* 开场的章节只讲了五个方向；这一行是所有有文章的分类，Misc / Forensics 之类的从这里进 */
+      counts.size > 1 && (
+        <nav class="dirs" aria-label="按分类浏览" data-reveal>
+          {[...counts].map(([key, n]) => {
+            const cat = categoryMeta(key);
+            return (
+              <a class="chip boxed" href={categoryUrl(key)} data-tone style={`--h:${cat.hue}`}>
+                {cat.label}
+                <span class="count">{n}</span>
+              </a>
+            );
+          })}
+        </nav>
+      )
+    }
     {
       latest.length > 0 ? (
         <ol class="post-list">
@@ -50,5 +66,15 @@ const latest = posts.slice(0, SITE.homePostCount);
   }
   .more {
     margin-top: 2rem;
+  }
+  .dirs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: -0.4rem 0 1.4rem;
+  }
+  .dirs .count {
+    opacity: 0.6;
+    font-variant-numeric: tabular-nums;
   }
 </style>

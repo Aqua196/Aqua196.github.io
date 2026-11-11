@@ -27,7 +27,11 @@ export default defineConfig({
     },
     processor: unified({
       remarkPlugins: [remarkMath, remarkCallouts, remarkCodeTitle],
-      rehypePlugins: [[rehypeKatex, { strict: false }], rehypeCodeWindow],
+      rehypePlugins: [
+        [rehypeKatex, { strict: false }],
+        // bg 要和 global.css 里两套主题的 --code-bg 一致：高亮配色按它校正对比度
+        [rehypeCodeWindow, { bg: { light: '#fdfdfb', dark: '#0e1114' } }],
+      ],
       remarkRehype: { footnoteLabel: '脚注', footnoteBackLabel: '返回正文' },
     }),
   },

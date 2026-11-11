@@ -61,7 +61,7 @@ function calendar(year: number, list: Post[]) {
             </h2>
             <div class="main">
               <div class="cal" data-reveal>
-                <svg viewBox={`0 -16 ${cal.width} ${cal.height + 16}`} role="img" aria-label={`${year} 年的发文日历，共 ${list.length} 篇`}>
+                <svg viewBox={`0 -16 ${cal.width} ${cal.height + 16}`} role="group" aria-label={`${year} 年的发文日历，共 ${list.length} 篇`}>
                   {cal.months.map((m) => (
                     <text class="month" x={m.x} y="-6">
                       {m.label}

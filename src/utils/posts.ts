@@ -26,11 +26,12 @@ export function countBy<T>(items: T[], key: (item: T) => string | string[]): [st
  * 返回值按文章数从多到少排序。
  */
 export function tagGroups(posts: Post[]) {
-  const groups = new Map<string, { slug: string; names: Map<string, number>; posts: Post[] }>();
+  type Group = { slug: string; names: Map<string, number>; posts: Post[] };
+  const groups = new Map<string, Group>();
   for (const post of posts) {
     for (const tag of new Set(post.data.tags)) {
       const slug = slugify(tag);
-      const g = groups.get(slug) ?? { slug, names: new Map(), posts: [] };
+      const g: Group = groups.get(slug) ?? { slug, names: new Map(), posts: [] };
       g.names.set(tag, (g.names.get(tag) ?? 0) + 1);
       if (!g.posts.includes(post)) g.posts.push(post);
       groups.set(slug, g);

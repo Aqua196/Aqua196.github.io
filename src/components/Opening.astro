@@ -88,7 +88,7 @@ const chapters = [
           </p>
           <a class="skip-intro more-link" href="#latest">跳过开场，直接看文章</a>
         </div>
-        <a class="cue mono" href="#chapters" aria-label="往下滚动">
+        <a class="cue mono" href="#chapters" aria-label="scroll，往下滚动到章节">
           <span>scroll</span>
           <i aria-hidden="true"></i>
         </a>
@@ -386,6 +386,15 @@ const chapters = [
     opacity: 0.16;
     transform: translateY(18px);
   }
+  /* 淡影是给眼睛看的引导，不该挡住人：键盘焦点进来了，或者系统要求高对比度，就不淡 */
+  :global(.js) .chapter:focus-within .card {
+    opacity: 1;
+  }
+  @media (prefers-contrast: more) {
+    :global(.js) .chapter .card {
+      opacity: 1;
+    }
+  }
   .no {
     margin: 0;
     font-size: 0.72rem;
@@ -614,9 +623,10 @@ const chapters = [
     measure();
     let box = want();
     let last = performance.now();
-    const layout = () => {
+    // still：引擎在画静态帧（减弱动效，或者设备跑不动），没有“下一帧”可以接着过渡，直接到位
+    const layout = (still: boolean) => {
       const now = performance.now();
-      const k = reduce ? 1 : 1 - Math.exp(-Math.min(0.1, (now - last) / 1000) * 3.2);
+      const k = still ? 1 : 1 - Math.exp(-Math.min(0.1, (now - last) / 1000) * 3.2);
       last = now;
       const to = want();
       box = { x: box.x + (to.x - box.x) * k, y: box.y + (to.y - box.y) * k, r: box.r + (to.r - box.r) * k };
@@ -633,7 +643,10 @@ const chapters = [
       clickNext: false,
       onStats: ({ fps, count }) => {
         $('hud-count')!.textContent = fmt.format(count);
-        $('hud-fps')!.textContent = fps ? String(fps) : '—';
+        // fps 为 0 表示引擎进了静态模式（减弱动效，或者这台设备跑不动），之后不会再回到动画
+        const rate = $('hud-fps');
+        if (fps) rate && (rate.textContent = String(fps));
+        else if (rate?.parentElement) rate.parentElement.textContent = 'static frame';
       },
     });
     if (sculpture) {
