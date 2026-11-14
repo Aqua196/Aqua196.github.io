@@ -1,68 +1,42 @@
 ---
 import Base from '../layouts/Base.astro';
-import Hero from '../components/Hero.astro';
+import Opening from '../components/Opening.astro';
 import PostRow from '../components/PostRow.astro';
 import Empty from '../components/Empty.astro';
 import { SITE } from '../config';
-import { getHomePosts, countBy, categoryMeta, tagGroups } from '../utils/posts';
-import { url, categoryUrl, tagUrl } from '../utils/url';
+import { getHomePosts, countBy, tagGroups, categoryMeta } from '../utils/posts';
+import { url, categoryUrl } from '../utils/url';
 
 const posts = await getHomePosts();
-const categories = countBy(posts, (p) => p.data.category);
+const counts = new Map(countBy(posts, (p) => p.data.category));
 const tags = tagGroups(posts);
 const latest = posts.slice(0, SITE.homePostCount);
-
-// 跑马灯：用标签，还没有标签时用首页标语；不够长就重复几遍
-let ticker = tags.length ? tags.map((t) => t.name) : [...SITE.taglines];
-while (ticker.length > 0 && ticker.length < 14) ticker = ticker.concat(ticker);
 ---
 
 <Base>
-  <Hero postCount={posts.length} categoryCount={categories.length} tagCount={tags.length} />
-
-  {
-    ticker.length > 0 && (
-      <div class="ticker mono" aria-hidden="true">
-        <div class="track">
-          {[0, 1].map(() => (
-            <div class="row">
-              {ticker.map((t) => (
-                <span>{t}</span>
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  {
-    categories.length > 0 && (
-      <section class="container block">
-        <div class="section-head" data-reveal>
-          <h2>
-            <span data-scramble>Index</span>
-            <span class="zh">分类</span>
-          </h2>
-          <a href={url('/categories')}>all categories →</a>
-        </div>
-        <div class="cats" data-reveal>
-          {categories.map(([key, n]) => (
-            <a href={categoryUrl(key)}>
-              <span class="name mono">{categoryMeta(key).label}</span>
-              <span class="n mono">{String(n).padStart(2, '0')}</span>
-            </a>
-          ))}
-        </div>
-      </section>
-    )
-  }
+  <Opening postCount={posts.length} categoryCount={counts.size} tagCount={tags.length} counts={counts} />
 
   <section class="container block" id="latest">
     <div class="section-head" data-reveal>
-      <h2><span data-scramble>Latest</span><span class="zh">最新文章</span></h2>
-      <a href={url('/archive')}>view all →</a>
+      <h2>Latest<span class="zh">最新文章</span></h2>
+      {posts.length > 0 && <a class="more-link" href={url('/archive')}>view all</a>}
     </div>
+    {
+      /* 开场的章节只讲了五个方向；这一行是所有有文章的分类，Misc / Forensics 之类的从这里进 */
+      counts.size > 1 && (
+        <nav class="dirs" aria-label="按分类浏览" data-reveal>
+          {[...counts].map(([key, n]) => {
+            const cat = categoryMeta(key);
+            return (
+              <a class="chip boxed" href={categoryUrl(key)} data-tone style={`--h:${cat.hue}`}>
+                {cat.label}
+                <span class="count">{n}</span>
+              </a>
+            );
+          })}
+        </nav>
+      )
+    }
     {
       latest.length > 0 ? (
         <ol class="post-list">
@@ -78,131 +52,29 @@ while (ticker.length > 0 && ticker.length < 14) ticker = ticker.concat(ticker);
       posts.length > latest.length && (
         <div class="more">
           <a class="btn" href={url('/archive')}>
-            查看全部 {posts.length} 篇 →
+            查看全部 {posts.length} 篇 <span class="arr" aria-hidden="true">→</span>
           </a>
         </div>
       )
     }
   </section>
-
-  {
-    tags.length > 0 && (
-      <section class="container block">
-        <div class="section-head" data-reveal>
-          <h2>
-            <span data-scramble>Tags</span>
-            <span class="zh">标签</span>
-          </h2>
-          <a href={url('/tags')}>all tags →</a>
-        </div>
-        <div class="tags mono" data-reveal>
-          {tags.slice(0, 30).map((t) => (
-            <a href={tagUrl(t.name)}>
-              #{t.name}
-              <sup>{t.posts.length}</sup>
-            </a>
-          ))}
-        </div>
-      </section>
-    )
-  }
 </Base>
 
 <style>
   .block {
-    margin-top: 5rem;
+    margin-top: 2rem;
   }
-
-  /* ---------- 标签跑马灯：上下两条细线夹住的一行等宽字 ---------- */
-  .ticker {
-    overflow: hidden;
-    border-block: 1px solid var(--line-2);
-    color: var(--fg-2);
-    padding: 0.85rem 0;
-    mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
-    -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
-  }
-  .track {
-    display: flex;
-    width: max-content;
-    animation: marquee 45s linear infinite;
-  }
-  .ticker:hover .track {
-    animation-play-state: paused;
-  }
-  .row {
-    display: flex;
-    font-size: 0.85rem;
-    letter-spacing: 0.04em;
-    white-space: nowrap;
-  }
-  .row span::after {
-    content: '✕';
-    margin: 0 1.6rem;
-    font-size: 0.6em;
-    vertical-align: 0.2em;
-    color: var(--muted);
-  }
-  @keyframes marquee {
-    to {
-      transform: translateX(-50%);
-    }
-  }
-
-  /* ---------- 分类 ---------- */
-  .cats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
-    border-top: 1px solid var(--line);
-    border-left: 1px solid var(--line);
-  }
-  .cats a {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    padding: 1rem 1.1rem;
-    border-right: 1px solid var(--line);
-    border-bottom: 1px solid var(--line);
-    transition: background 0.12s, color 0.12s;
-  }
-  .cats a:hover {
-    background: var(--fg);
-    color: var(--bg);
-  }
-  .name {
-    font-size: 0.85rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-  .n {
-    font-size: 1.5rem;
-    font-weight: 700;
-    letter-spacing: -0.03em;
-  }
-
   .more {
     margin-top: 2rem;
   }
-
-  .tags {
+  .dirs {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.4rem 0.5rem;
+    gap: 0.5rem;
+    margin: -0.4rem 0 1.4rem;
   }
-  .tags a {
-    font-size: 0.82rem;
-    padding: 0.2rem 0.55rem;
-    border: 1px solid var(--line-2);
-    transition: background 0.12s, color 0.12s, border-color 0.12s;
-  }
-  .tags a:hover {
-    background: var(--fg);
-    color: var(--bg);
-    border-color: var(--fg);
-  }
-  .tags sup {
-    margin-left: 0.15rem;
-    opacity: 0.55;
+  .dirs .count {
+    opacity: 0.6;
+    font-variant-numeric: tabular-nums;
   }
 </style>

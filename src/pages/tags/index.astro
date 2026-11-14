@@ -1,35 +1,65 @@
 ---
 import Base from '../../layouts/Base.astro';
 import Empty from '../../components/Empty.astro';
-import { getPosts, tagGroups } from '../../utils/posts';
+import Kinetic from '../../components/Kinetic.astro';
+import { getPosts, tagGroups, categoryMeta, countBy } from '../../utils/posts';
 import { tagUrl } from '../../utils/url';
 
 const tags = tagGroups(await getPosts());
-const counts = tags.map((t) => t.posts.length);
-const min = Math.min(...counts);
-const max = Math.max(...counts);
-// 按最少~最多归一化；大家次数都一样时统一用基础字号
-const size = (n: number) => (0.9 + ((n - min) / (max - min || 1)) * 1.1).toFixed(2);
+
+// ---------- 关系图的数据：节点是标签，同一篇文章里一起出现过的两个标签之间连一条边 ----------
+const nodes = tags.map((t) => ({
+  id: t.slug,
+  name: t.name,
+  count: t.posts.length,
+  href: tagUrl(t.name),
+  // 颜色取这个标签下文章最多的那个分类
+  hue: categoryMeta(countBy(t.posts, (p) => p.data.category)[0][0]).hue,
+}));
+const weights = new Map<string, number>();
+const slugsOf = new Map<string, string[]>();
+for (const t of tags) for (const p of t.posts) slugsOf.set(p.id, [...(slugsOf.get(p.id) ?? []), t.slug]);
+for (const slugs of slugsOf.values()) {
+  for (let i = 0; i < slugs.length; i++) {
+    for (let j = i + 1; j < slugs.length; j++) {
+      const key = [slugs[i], slugs[j]].sort().join('\n');
+      weights.set(key, (weights.get(key) ?? 0) + 1);
+    }
+  }
+}
+const links = [...weights].map(([key, weight]) => {
+  const [source, target] = key.split('\n');
+  return { source, target, weight };
+});
 ---
 
-<Base title="标签" description="所有标签">
+<Base title="标签" description="所有标签，以及它们之间的关系">
   <div class="container">
     <header class="page-head">
-      <div class="eyebrow" data-reveal>$ sort tags | uniq -c</div>
-      <h1 data-reveal style="--delay:.05s"><span data-scramble data-scramble-load>Tags</span></h1>
-      <p data-reveal style="--delay:.1s">{tags.length} 个标签，字越大用得越多。</p>
+      <div class="eyebrow" data-reveal>sort tags | uniq -c</div>
+      <h1><Kinetic text="Tags" /></h1>
+      <p data-reveal style="--delay:.1s">
+        {tags.length} 个标签。在同一篇文章里出现过的标签连在一起；圆越大，用得越多。可以拖着玩。
+      </p>
     </header>
 
     {
       tags.length > 0 ? (
-        <div class="cloud mono" data-reveal style="--delay:.15s">
-          {tags.map((t) => (
-            <a href={tagUrl(t.name)} style={`--s:${size(t.posts.length)}rem`}>
-              #{t.name}
-              <sup>{t.posts.length}</sup>
-            </a>
-          ))}
-        </div>
+        <>
+          <div class="graph" id="tag-graph" data-graph={JSON.stringify({ nodes, links })} data-reveal style="--delay:.15s">
+            <svg aria-label="标签关系图" />
+          </div>
+          <ul class="index" data-reveal>
+            {tags.map((t) => (
+              <li>
+                <a class="tag" href={tagUrl(t.name)}>
+                  {t.name}
+                  <span class="n">{t.posts.length}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </>
       ) : (
         <Empty cmd="sort tags | uniq -c" />
       )
@@ -38,27 +68,285 @@ const size = (n: number) => (0.9 + ((n - min) / (max - min || 1)) * 1.1).toFixed
 </Base>
 
 <style>
-  .cloud {
+  .graph {
+    height: min(560px, 68vh);
+    margin-bottom: 2.5rem;
+    background:
+      radial-gradient(circle, var(--line-2) 1px, transparent 1.4px) 0 0 / 26px 26px,
+      var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    overflow: hidden;
+    touch-action: pan-y;
+  }
+  .graph svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .graph :global(line) {
+    stroke: var(--line-2);
+    transition: stroke 0.2s, opacity 0.2s;
+  }
+  .graph :global(a) {
+    cursor: grab;
+    outline: none;
+    transition: opacity 0.2s;
+  }
+  .graph :global(circle) {
+    fill: color-mix(in oklch, var(--cat) 22%, var(--bg-2));
+    stroke: var(--cat);
+    stroke-width: 1.5;
+    transition: fill 0.2s;
+  }
+  .graph :global(text) {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    fill: var(--fg-2);
+    paint-order: stroke;
+    stroke: var(--bg-2);
+    stroke-width: 4px;
+    stroke-linejoin: round;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: fill 0.2s;
+  }
+  /* 悬停（或键盘聚焦）一个标签：它和它的邻居保持原样，其余的退下去 */
+  .graph:global(.focus) :global(a:not(.near)),
+  .graph:global(.focus) :global(line:not(.near)) {
+    opacity: 0.18;
+  }
+  .graph :global(a.self circle),
+  .graph :global(a:focus-visible circle) {
+    fill: var(--cat);
+  }
+  .graph :global(a.self text),
+  .graph :global(a:focus-visible text) {
+    fill: var(--fg);
+  }
+  .graph :global(line.near) {
+    stroke: var(--muted);
+  }
+  .index {
     display: flex;
     flex-wrap: wrap;
-    align-items: baseline;
-    gap: 0.5rem 0.6rem;
-    max-width: 900px;
+    gap: 0.5rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
   }
-  a {
-    font-size: var(--s);
-    padding: 0.15em 0.5em;
-    border: 1px solid var(--line-2);
-    transition: background 0.12s, color 0.12s, border-color 0.12s;
-  }
-  a:hover {
-    background: var(--fg);
-    color: var(--bg);
-    border-color: var(--fg);
-  }
-  sup {
-    font-size: 0.6em;
-    margin-left: 0.15em;
-    opacity: 0.55;
+  @media (max-width: 600px) {
+    .graph {
+      height: 440px;
+    }
   }
 </style>
+
+<script>
+  import { navigate } from 'astro:transitions/client';
+
+  // ============================================================
+  //  一个手写的力导向布局：没有用 d3。
+  //  每一步：所有节点两两相斥（顺便处理重叠）→ 有边的两个节点被弹簧拉近 → 整体被轻轻拉向中心 → 速度衰减。
+  //  “温度”alpha 逐步下降，降到阈值就停，不会一直占着 CPU；拖动节点时重新加热。
+  // ============================================================
+  type Node = { id: string; name: string; count: number; href: string; hue: number; x: number; y: number; vx: number; vy: number; r: number; pinned?: boolean };
+  type Link = { source: Node; target: Node; weight: number };
+
+  const NS = 'http://www.w3.org/2000/svg';
+  let stop: (() => void) | null = null;
+
+  function start() {
+    const host = document.getElementById('tag-graph');
+    const svg = host?.querySelector('svg');
+    if (!host || !svg) return;
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const data = JSON.parse(host.dataset.graph!) as { nodes: Omit<Node, 'x' | 'y' | 'vx' | 'vy' | 'r'>[]; links: { source: string; target: string; weight: number }[] };
+
+    let W = host.clientWidth, H = host.clientHeight;
+    const max = Math.max(1, ...data.nodes.map((n) => n.count));
+    // 初始位置：按顺序摆在一条螺旋上（固定的，不用随机数），同一次构建每次打开都从同一个样子开始
+    const nodes: Node[] = data.nodes.map((n, i) => {
+      const a = i * 2.399963, d = 40 * Math.sqrt(i + 1);
+      return { ...n, x: W / 2 + Math.cos(a) * d, y: H / 2 + Math.sin(a) * d, vx: 0, vy: 0, r: 7 + 13 * Math.sqrt(n.count / max) };
+    });
+    const byId = new Map(nodes.map((n) => [n.id, n]));
+    const links: Link[] = data.links.map((l) => ({ source: byId.get(l.source)!, target: byId.get(l.target)!, weight: l.weight })).filter((l) => l.source && l.target);
+    const neighbours = new Map<Node, Set<Node>>(nodes.map((n) => [n, new Set([n])]));
+    for (const l of links) {
+      neighbours.get(l.source)!.add(l.target);
+      neighbours.get(l.target)!.add(l.source);
+    }
+
+    // ---------- DOM：只建一次，之后每一步只改坐标 ----------
+    svg.replaceChildren();
+    const lineEls = links.map(() => svg.appendChild(document.createElementNS(NS, 'line')));
+    const nodeEls = nodes.map((n) => {
+      const a = document.createElementNS(NS, 'a');
+      a.setAttribute('href', n.href);
+      a.setAttribute('data-tone', '');
+      a.style.setProperty('--h', String(n.hue));
+      a.setAttribute('aria-label', `${n.name}，${n.count} 篇`);
+      const c = document.createElementNS(NS, 'circle');
+      c.setAttribute('r', String(n.r));
+      const t = document.createElementNS(NS, 'text');
+      t.textContent = n.name;
+      t.setAttribute('x', String(n.r + 6));
+      t.setAttribute('y', '4');
+      a.append(c, t);
+      return svg.appendChild(a);
+    });
+    const paint = () => {
+      links.forEach((l, i) => {
+        const el = lineEls[i];
+        el.setAttribute('x1', l.source.x.toFixed(1));
+        el.setAttribute('y1', l.source.y.toFixed(1));
+        el.setAttribute('x2', l.target.x.toFixed(1));
+        el.setAttribute('y2', l.target.y.toFixed(1));
+      });
+      nodes.forEach((n, i) => nodeEls[i].setAttribute('transform', `translate(${n.x.toFixed(1)} ${n.y.toFixed(1)})`));
+    };
+
+    // ---------- 物理 ----------
+    // 理想间距按“画框面积 / 节点数”来定：画框大就摊开，节点多就挤一点
+    let ideal = 0;
+    const scale = () => (ideal = Math.max(44, Math.sqrt((W * H) / nodes.length) * 0.6));
+    scale();
+    let alpha = 1;
+    const tick = () => {
+      for (let i = 0; i < nodes.length; i++) {
+        const a = nodes[i];
+        for (let j = i + 1; j < nodes.length; j++) {
+          const b = nodes[j];
+          let dx = b.x - a.x, dy = b.y - a.y;
+          let d2 = dx * dx + dy * dy;
+          if (d2 < 1e-3) {
+            // 两个点叠在一起：朝固定方向推开，不用随机数
+            dx = 0.5 - (i % 2);
+            dy = 0.5 - (j % 2);
+            d2 = 0.5;
+          }
+          const d = Math.sqrt(d2);
+          // 斥力随距离平方衰减；真的重叠了再额外推开
+          let f = (ideal * ideal * 0.5 * alpha) / d2;
+          const overlap = a.r + b.r + 22 - d;
+          if (overlap > 0) f += overlap * 0.35;
+          const fx = (dx / d) * f, fy = (dy / d) * f;
+          a.vx -= fx;
+          a.vy -= fy;
+          b.vx += fx;
+          b.vy += fy;
+        }
+        // 向中心的拉力：竖直方向更强一些，把图压成扁的（画框是横的）
+        a.vx += (W / 2 - 30 - a.x) * 0.006 * alpha;
+        a.vy += (H / 2 - a.y) * 0.012 * alpha;
+      }
+      for (const l of links) {
+        const dx = l.target.x - l.source.x, dy = l.target.y - l.source.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const k = ((d - (ideal * 0.75 + l.source.r + l.target.r)) / d) * 0.05 * Math.min(2, l.weight) * alpha;
+        l.source.vx += dx * k;
+        l.source.vy += dy * k;
+        l.target.vx -= dx * k;
+        l.target.vy -= dy * k;
+      }
+      for (const n of nodes) {
+        if (n.pinned) {
+          n.vx = n.vy = 0;
+          continue;
+        }
+        n.vx *= 0.82;
+        n.vy *= 0.82;
+        n.x = Math.max(n.r + 4, Math.min(W - n.r - 70, n.x + n.vx));
+        n.y = Math.max(n.r + 4, Math.min(H - n.r - 4, n.y + n.vy));
+      }
+      alpha *= 0.985;
+    };
+
+    let raf = 0;
+    const loop = () => {
+      tick();
+      paint();
+      raf = alpha > 0.02 ? requestAnimationFrame(loop) : 0;
+    };
+    const heat = (to: number) => {
+      alpha = Math.max(alpha, to);
+      if (reduce) {
+        while (alpha > 0.02) tick();
+        paint();
+      } else if (!raf) raf = requestAnimationFrame(loop);
+    };
+    heat(1);
+
+    // ---------- 交互：悬停高亮邻居，拖动节点，点击跳转 ----------
+    const focus = (n: Node | null) => {
+      host.classList.toggle('focus', !!n);
+      const near = n ? neighbours.get(n)! : null;
+      nodes.forEach((m, i) => {
+        nodeEls[i].classList.toggle('near', !!near?.has(m));
+        nodeEls[i].classList.toggle('self', m === n);
+      });
+      links.forEach((l, i) => lineEls[i].classList.toggle('near', l.source === n || l.target === n));
+    };
+    let drag: { node: Node; moved: number; x: number; y: number } | null = null;
+    nodeEls.forEach((el, i) => {
+      const n = nodes[i];
+      el.addEventListener('pointerenter', () => !drag && focus(n));
+      el.addEventListener('pointerleave', () => !drag && focus(null));
+      el.addEventListener('focus', () => focus(n));
+      el.addEventListener('blur', () => focus(null));
+      el.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
+        drag = { node: n, moved: 0, x: e.clientX, y: e.clientY };
+        n.pinned = true;
+        el.setPointerCapture(e.pointerId);
+        focus(n);
+      });
+      el.addEventListener('pointermove', (e) => {
+        if (!drag || drag.node !== n) return;
+        const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+        drag.x = e.clientX;
+        drag.y = e.clientY;
+        drag.moved += Math.abs(dx) + Math.abs(dy);
+        n.x += dx;
+        n.y += dy;
+        heat(0.35);
+      });
+      const release = () => {
+        if (drag?.node !== n) return;
+        n.pinned = false;
+        // 拖过就不算点击：下面的 click 监听会看这个标记
+        el.dataset.dragged = drag.moved > 5 ? '1' : '';
+        drag = null;
+        focus(null);
+        heat(0.25);
+      };
+      el.addEventListener('pointerup', release);
+      el.addEventListener('pointercancel', release);
+      el.addEventListener('dragstart', (e) => e.preventDefault());
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (el.dataset.dragged) return void (el.dataset.dragged = '');
+        navigate(n.href);
+      });
+    });
+
+    const onResize = () => {
+      W = host.clientWidth;
+      H = host.clientHeight;
+      scale();
+      heat(0.5);
+    };
+    window.addEventListener('resize', onResize);
+    stop = () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', onResize);
+    };
+  }
+
+  document.addEventListener('astro:page-load', start);
+  document.addEventListener('astro:before-swap', () => {
+    stop?.();
+    stop = null;
+  });
+</script>

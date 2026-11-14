@@ -25,7 +25,7 @@ const posts = defineCollection({
     points: blank(z.number().optional()),
     solves: blank(z.number().optional()),
     /** 原题链接 */
-    source: blank(z.string().url().optional()),
+    source: blank(z.url().optional()),
     /** 置顶 */
     pinned: blank(z.boolean().default(false)),
     /** 草稿不会被构建 */

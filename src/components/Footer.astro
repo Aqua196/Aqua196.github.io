@@ -1,5 +1,5 @@
 ---
-import { SITE, SOCIALS } from '../config';
+import { NAV, SITE, SOCIALS } from '../config';
 import { url } from '../utils/url';
 import Socials from './Socials.astro';
 
@@ -7,48 +7,197 @@ const year = new Date().getFullYear();
 ---
 
 <footer class="site-footer">
-  <div class="container inner mono">
-    <div class="left">
-      <span>© {year} {SITE.author}</span>
-      <span class="dim">uptime <span id="uptime" data-since={SITE.since}>--</span></span>
+  <div class="container">
+    <div class="top">
+      <div class="brand">
+        <p class="desc">{SITE.description}</p>
+      </div>
+      <nav class="cols" aria-label="页脚导航">
+        <ul>
+          {NAV.map((item) => <li><a href={url(item.href)}>{item.label}</a></li>)}
+        </ul>
+        <ul>
+          <Socials socials={SOCIALS} />
+          <li><a href={url('/rss.xml')}>RSS</a></li>
+        </ul>
+      </nav>
     </div>
-    <div class="right">
-      <Socials socials={SOCIALS} />
-      <a href={url('/rss.xml')}>RSS</a>
-      <span class="dim">
-        built with <a href="https://astro.build" target="_blank" rel="noopener">Astro</a>
+    <div class="bottom mono">
+      <span>© {year} {SITE.author}</span>
+      <span class="up"><i aria-hidden="true"></i>uptime <span id="uptime" data-since={SITE.since}>--</span></span>
+      <span class="built">
+        <button type="button" class="term-btn" data-open-terminal aria-label="打开终端"><span aria-hidden="true">&gt;_</span> 终端 <kbd>`</kbd></button>
+        <a href={url('/colophon')}>本站是怎么做的</a>
       </span>
     </div>
   </div>
+  <!-- 巨型字标：描边的字里盛着一池水，滚到页面底部时水位涨起来 -->
+  <p class="wordmark" aria-hidden="true" data-text={SITE.author} style={`--chars:${SITE.author.length}`}>{SITE.author}</p>
 </footer>
 
 <style>
   .site-footer {
-    margin-top: 7rem;
+    margin-top: 8rem;
     border-top: 1px solid var(--line);
+    background: var(--bg-2);
+    overflow: hidden;
   }
-  .inner {
+  .top {
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
-    gap: 0.8rem 2rem;
-    padding-top: 1.5rem;
-    padding-bottom: 2rem;
-    font-size: 0.75rem;
+    gap: 2.5rem 4rem;
+    padding: 3.5rem 0 3rem;
   }
-  .left,
-  .right {
+  .desc {
+    margin: 0;
+    max-width: 24rem;
+    font-family: var(--font-display);
+    font-size: 1.7rem;
+    line-height: 1.35;
+    color: var(--fg-2);
+    text-wrap: balance;
+  }
+  .cols {
+    display: flex;
+    gap: 4rem;
+  }
+  ul {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(3, auto);
+    align-content: start;
+    gap: 0.55rem 3rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 0.9rem;
+  }
+  ul :global(a) {
+    color: var(--fg-2);
+    transition: color 0.2s;
+  }
+  ul :global(a:hover) {
+    color: var(--accent);
+  }
+  .bottom {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem 1.2rem;
-  }
-  .dim {
+    gap: 0.5rem 1.6rem;
+    padding: 1.2rem 0 1.6rem;
+    border-top: 1px solid var(--line);
+    font-size: 0.72rem;
     color: var(--muted);
   }
-  a:hover {
-    text-decoration: underline;
-    text-underline-offset: 3px;
+  .up {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    font-variant-numeric: tabular-nums;
+  }
+  .up i {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .built {
+    display: inline-flex;
+    align-items: center;
+    gap: 1.4rem;
+    margin-left: auto;
+  }
+  .built a,
+  .term-btn {
+    color: var(--fg-2);
+    transition: color 0.2s;
+  }
+  .term-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    cursor: pointer;
+  }
+  .term-btn span {
+    color: var(--accent);
+  }
+  .built a:hover,
+  .term-btn:hover {
+    color: var(--accent);
+  }
+
+  /* ---------- 字标 ---------- */
+  .wordmark {
+    --p: 0.5; /* 水位 0 ~ 1 */
+    --wx: 0px; /* 波浪的水平位移 */
+    --lh: 0.8em; /* 字的可见高度：行高压到比字身还矮，底部被页面边缘切掉一点 */
+    position: relative;
+    width: fit-content;
+    margin: 1rem auto 0;
+    font-family: var(--font-display);
+    /* 每个字符平均约 0.56em 宽，让整个名字刚好撑满版心 */
+    font-size: clamp(4rem, calc(88vw / (var(--chars) * 0.56)), 21rem);
+    line-height: var(--lh);
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+    color: transparent;
+    -webkit-text-stroke: 1px var(--line-2);
+    user-select: none;
+  }
+  /* 同一行字再叠一层实心的，用 mask 只露出“水面以下”：上面一条重复的波浪 + 下面一整块 */
+  .wordmark::after {
+    content: attr(data-text);
+    position: absolute;
+    inset: 0;
+    color: var(--accent);
+    -webkit-text-stroke: 0;
+    --level: calc(var(--p) * var(--lh));
+    --wave: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 24' preserveAspectRatio='none'%3E%3Cpath d='M0 12c40-16 80-16 120 0s80 16 120 0v12H0z'/%3E%3C/svg%3E");
+    -webkit-mask-image: var(--wave), linear-gradient(#000, #000);
+    mask-image: var(--wave), linear-gradient(#000, #000);
+    -webkit-mask-repeat: repeat-x, no-repeat;
+    mask-repeat: repeat-x, no-repeat;
+    -webkit-mask-size: 0.9em 0.07em, 100% var(--level);
+    mask-size: 0.9em 0.07em, 100% var(--level);
+    -webkit-mask-position: left var(--wx) bottom calc(var(--level) - 1px), 0 100%;
+    mask-position: left var(--wx) bottom calc(var(--level) - 1px), 0 100%;
+    animation: water-wave 5s linear infinite;
+  }
+  @keyframes water-wave {
+    to {
+      --wx: -0.9em;
+    }
+  }
+  /* 注意：Astro 不会给 @keyframes 加作用域，名字是全局的，所以要起得独一无二。
+     支持滚动驱动动画的浏览器：字标进入视口的过程就是涨水的过程 */
+  @supports (animation-timeline: view()) {
+    .wordmark {
+      animation: water-rise linear both;
+      animation-timeline: view();
+      animation-range: entry 10% cover 55%;
+    }
+    @keyframes water-rise {
+      from {
+        --p: 0.04;
+      }
+      to {
+        --p: 0.62;
+      }
+    }
+  }
+  @media (max-width: 560px) {
+    .built {
+      margin-left: 0;
+    }
+    .term-btn kbd {
+      display: none;
+    }
   }
 </style>
 

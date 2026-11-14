@@ -6,29 +6,45 @@ interface Props {
 const { cmd = 'ls ./writeups' } = Astro.props;
 ---
 
-<div class="empty mono" data-reveal>
-  <p><span class="ps">$</span> {cmd}</p>
-  <p class="dim">total 0</p>
+<div class="empty" data-reveal>
+  <div class="term mono" aria-hidden="true">
+    <p><span class="ps">$</span> {cmd}</p>
+    <p class="dim">total 0</p>
+    <p><span class="ps">$</span> <span class="caret"></span></p>
+  </div>
   <p class="msg">这里还没有已发布的文章。<slot /></p>
 </div>
 
 <style>
   .empty {
-    padding: 1.4rem 0 1.6rem;
-    border-top: 1px solid var(--line);
-    border-bottom: 1px solid var(--line);
-    font-size: 0.85rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1.5rem 2.5rem;
+    padding: 2rem;
+    border: 1px dashed var(--line-2);
+    border-radius: var(--radius);
   }
-  p {
-    margin: 0.2rem 0;
+  .term {
+    flex: none;
+    min-width: min(100%, 16rem);
+    padding: 1rem 1.2rem;
+    font-size: 0.8rem;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
   }
-  .ps,
+  .term p {
+    margin: 0.15rem 0;
+  }
+  .ps {
+    color: var(--accent);
+  }
   .dim {
     color: var(--muted);
   }
   .msg {
-    margin-top: 1rem;
-    font-family: var(--font-body);
+    margin: 0;
     color: var(--fg-2);
   }
 </style>

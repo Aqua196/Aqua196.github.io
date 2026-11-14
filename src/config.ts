@@ -35,17 +35,18 @@ export const SOCIALS = {
 };
 
 /**
- * 分类：key 写在文章 frontmatter 的 category 里，label 是显示名。
- * 不在这里的分类也能用，会直接显示 key。
+ * 分类：key 写在文章 frontmatter 的 category 里，label 是显示名，
+ * hue 是这个分类的代表色（色相 0~360：0 红、60 黄、150 绿、190 青、250 蓝、300 紫）。
+ * 不在这里的分类也能用，会直接显示 key，颜色自动分配。
  */
-export const CATEGORIES: Record<string, { label: string }> = {
-  pwn: { label: 'Pwn' },
-  web: { label: 'Web' },
-  crypto: { label: 'Crypto' },
-  reverse: { label: 'Reverse' },
-  misc: { label: 'Misc' },
-  forensics: { label: 'Forensics' },
-  algo: { label: 'Algorithm' },
+export const CATEGORIES: Record<string, { label: string; hue?: number }> = {
+  pwn: { label: 'Pwn', hue: 22 },
+  web: { label: 'Web', hue: 250 },
+  crypto: { label: 'Crypto', hue: 305 },
+  reverse: { label: 'Reverse', hue: 55 },
+  misc: { label: 'Misc', hue: 95 },
+  forensics: { label: 'Forensics', hue: 150 },
+  algo: { label: 'Algorithm', hue: 190 },
 };
 
 export const NAV = [

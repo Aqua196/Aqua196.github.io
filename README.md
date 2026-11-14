@@ -1,15 +1,18 @@
 # Writeup Lab
 
-基于 [Astro](https://astro.build) 的静态博客，用来放 CTF / 算法题的解题 writeup，部署在 GitHub Pages。黑白配色，没有评论、点赞这类功能。
+基于 [Astro](https://astro.build) 的静态博客，用来放 CTF / 算法题的解题 writeup，部署在 GitHub Pages。衬线大标题 + 等宽小字的杂志式排版，一个水色主色，每个分类有自己的代表色；没有评论、点赞这类功能。
 
 ## 功能
 
-- 首页：实时渲染的 ASCII 圆环、打字机效果、标签跑马灯、分类索引
-- 文章：题目信息卡（比赛 / 分值 / 解出数 / 难度）、自动编号标题、吸顶目录、阅读进度
-- Markdown 增强：代码窗口（文件名、行号、复制按钮）、KaTeX 数学公式、GitHub 风格提示块、可折叠 Hint、**Flag 黑条打码**
-- 全站搜索（<kbd>Ctrl</kbd> + <kbd>K</kbd> 或 <kbd>/</kbd>），支持正文内容
-- 归档时间线、分类、标签、RSS、sitemap
-- 明暗主题切换（默认跟随系统），页面切换动画，适配手机
+- **首页开场**：整屏的名字是 16 万个粒子拼出来的（手写 WebGL2，没有用 three.js；位置和速度都存在显存里，每帧用 transform feedback 做物理积分）。往下滚，名字散开，依次重组成三叶结、莫比乌斯带、克莱因瓶、博罗梅安环和“196”，每个对象对应一个方向；可以拖动旋转、用鼠标搅动、点击炸开。掉帧时自动降画质，实在跑不动（没有硬件加速）就改成静态画面；不支持 WebGL2 时退回普通的大标题和章节列表。404 页的大字也是同一个引擎拼的
+- **命令面板**：<kbd>Ctrl</kbd> / <kbd>⌘</kbd> + <kbd>K</kbd> 或 <kbd>/</kbd> 打开，全文搜索文章；输入 <kbd>&gt;</kbd> 执行命令（跳转、切主题、随机一篇……）
+- **浏览器里的终端**：按 <kbd>`</kbd> 打开。支持 `ls` / `cd` / `cat` / `grep` / `open`、管道、Tab 补全和历史记录，文件系统由站内文章生成；里面藏了一个 flag
+- **文章**：题目信息卡（比赛 / 分值 / 解出数 / 难度）、自动编号标题、带滑动指示条的吸顶目录、标题锚点（点击复制链接）、阅读进度
+- **Markdown 增强**：代码窗口（文件名、行号、复制按钮）、KaTeX 数学公式、GitHub 风格提示块、可折叠 Hint、**Flag 黑条打码**
+- **动效**：页面切换用 View Transitions（文章标题会从列表飞到页头，导航胶囊会滑到新位置，图片点开时从原位放大）、卡片上的指针光斑与倾斜、按钮磁吸、页脚会“涨水”的字标；系统开了“减弱动态效果”时全部关闭
+- **归档**：每年一条日历热力带，和下面的列表互相高亮；**标签**：手写力导向布局的标签关系图（同一篇文章里出现过的标签连在一起），可以拖
+- 分类（每个分类一个代表色）、RSS、sitemap，明暗主题（默认跟随系统），适配手机
+- `/colophon` 页面逐条说明了这些是怎么实现的
 
 ## 本地运行
 
@@ -18,6 +21,7 @@
 ```bash
 npm install
 npm run dev       # 打开 http://localhost:4321
+npm run check     # 类型检查（改了代码之后跑一下）
 ```
 
 ## 写文章
@@ -37,10 +41,13 @@ npm run new -- hitcon-2026-babyheap pwn
 | 要改的 | 位置 |
 | --- | --- |
 | 站名、ID、简介、首页轮播短语、建站日期 | `src/config.ts` → `SITE` |
+| 首页往下滚时每一章的文案 | `src/components/Opening.astro` 顶部的 `chapters` |
 | 社交链接 | `src/config.ts` → `SOCIALS` |
-| 分类名称 | `src/config.ts` → `CATEGORIES` |
+| 分类名称和代表色 | `src/config.ts` → `CATEGORIES`（`hue` 是色相，0~360） |
 | 关于页 | `src/pages/about.md` |
-| 主题颜色 | `src/styles/global.css` 顶部的变量 |
+| 分享卡片图（发链接时显示的预览图） | `public/og.png`，1200×630；改了 ID 后记得换一张 |
+| 主题颜色 | `src/styles/global.css` 顶部的变量（主色是 `--accent`，明暗两套各改一处） |
+| 字体 | `src/styles/global.css` 的 `--font-display` / `--font-body` / `--font-mono` |
 | 代码高亮主题 | `astro.config.mjs` → `shikiConfig.themes` |
 
 ## 部署到 GitHub Pages
@@ -61,9 +68,10 @@ src/
 ├── config.ts              站点配置
 ├── content/posts/         文章（Markdown）
 ├── content.config.ts      frontmatter 字段定义
-├── components/            页头、页脚、搜索、目录、文章列表等
+├── components/            页头、页脚、命令面板、终端、目录、文章列表等
 ├── layouts/               页面骨架
-├── pages/                 路由（首页、归档、分类、标签、文章页、RSS、搜索索引）
+├── pages/                 路由（首页、归档、分类、标签、文章页、colophon、RSS、搜索索引）
 ├── plugins/               Markdown 插件（提示块、代码窗口、代码标题）
+├── scripts/               粒子引擎（particles.ts）、曲面定义、挂载逻辑、指针效果
 └── styles/                全局样式和正文排版
 ```

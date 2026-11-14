@@ -1,60 +1,77 @@
-<button class="to-top mono" id="to-top" type="button" aria-label="回到顶部">
-  <span class="pct" id="to-top-pct">0%</span>
-  <span class="up" aria-hidden="true">↑</span>
+<button class="to-top" id="to-top" type="button" aria-label="回到顶部">
+  <svg class="ring" viewBox="0 0 44 44" aria-hidden="true">
+    <circle class="track" cx="22" cy="22" r="20.5"></circle>
+    <circle class="bar" id="to-top-bar" cx="22" cy="22" r="20.5" pathLength="100"></circle>
+  </svg>
+  <svg class="up" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"></path></svg>
 </button>
 
 <style>
   .to-top {
     position: fixed;
-    right: 16px;
-    bottom: 16px;
+    right: 20px;
+    bottom: 20px;
     z-index: 40;
-    width: 48px;
-    height: 48px;
+    width: 44px;
+    height: 44px;
     display: grid;
     place-items: center;
-    border: 1px solid var(--fg);
-    background: var(--bg);
-    color: var(--fg);
-    font-size: 0.72rem;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: var(--bg-2);
+    color: var(--fg-2);
+    box-shadow: var(--shadow);
     cursor: pointer;
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(12px);
     pointer-events: none;
-    transition: opacity 0.2s, transform 0.3s var(--ease), background 0.15s, color 0.15s;
+    transition: opacity 0.25s, transform 0.35s var(--ease), color 0.2s;
   }
   .to-top.show {
     opacity: 1;
     transform: none;
     pointer-events: auto;
   }
-  .to-top > span {
+  .to-top > * {
     grid-area: 1 / 1;
   }
+  .ring {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+    fill: none;
+    stroke-width: 1.5;
+  }
+  .track {
+    stroke: var(--line-2);
+  }
+  /* 圆环 = 阅读进度 */
+  .bar {
+    stroke: var(--accent);
+    stroke-linecap: round;
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+  }
   .up {
-    font-size: 1.1rem;
-    opacity: 0;
+    transition: transform 0.3s var(--ease);
   }
   .to-top:hover {
-    background: var(--fg);
-    color: var(--bg);
-  }
-  .to-top:hover .pct {
-    opacity: 0;
+    color: var(--accent);
   }
   .to-top:hover .up {
-    opacity: 1;
+    transform: translateY(-2px);
   }
 </style>
 
 <script>
   function update() {
     const btn = document.getElementById('to-top');
-    const pct = document.getElementById('to-top-pct');
-    if (!btn || !pct) return;
+    const bar = document.getElementById('to-top-bar');
+    if (!btn || !bar) return;
     const max = document.documentElement.scrollHeight - innerHeight;
     const p = max > 0 ? Math.min(1, scrollY / max) : 0;
-    pct.textContent = `${Math.round(p * 100)}%`;
+    bar.style.strokeDashoffset = String(100 - p * 100);
     btn.classList.toggle('show', scrollY > 400);
   }
   window.addEventListener('scroll', () => requestAnimationFrame(update), { passive: true });
